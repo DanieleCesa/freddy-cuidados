@@ -1,0 +1,1981 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Cuidados do Freddy</title>
+<link rel="manifest" href="freddy-manifest.webmanifest">
+<meta name="theme-color" content="#4a7a3a">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="Freddy">
+<link rel="apple-touch-icon" href="assets/icon-freddy.svg">
+<link rel="icon" type="image/svg+xml" href="assets/icon-freddy.svg">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;500;600;700&family=Jost:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  :root {
+    --bege: #f4f2ee;
+    --bege-card: #fefdfb;
+    --bege-hover: #eeece7;
+    --verde: #4a7a3a;
+    --verde-claro: #6b9a55;
+    --verde-escuro: #335526;
+    --verde-suave: #e8efe0;
+    --texto: #2c2c2c;
+    --texto-sec: #6b6b6b;
+    --texto-fraco: #9a9a95;
+    --border: #d6d4cf;
+    --border-suave: #e6e4df;
+    --oral: #c89a3a;
+    --oral-bg: #f7ecd0;
+    --injec: #8a4a4a;
+    --injec-bg: #f0dede;
+    --topico: #6b8aa5;
+    --topico-bg: #dee7ef;
+    --banho: #7a5a9a;
+    --banho-bg: #e7e0ef;
+    --feito: #5a8a4a;
+    --feito-bg: #dfe9d5;
+    --pendente: #c2522a;
+    --pendente-bg: #f5e0d5;
+    --amarelo: #fdf5c2;
+  }
+  html, body { overscroll-behavior: none; }
+  body {
+    background: var(--bege);
+    color: var(--texto);
+    font-family: 'Jost', sans-serif;
+    font-size: 14px;
+    line-height: 1.5;
+    min-height: 100vh;
+    padding-bottom: 4rem;
+  }
+  h1, h2, h3, h4, .serif {
+    font-family: 'Cormorant Garamond', serif;
+    font-weight: 600;
+  }
+  a { color: var(--verde); }
+
+  header {
+    background: linear-gradient(135deg, #fefdfb 0%, #f7f3ea 100%);
+    border-bottom: 1px solid var(--border);
+    padding: 1.5rem 2rem;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 1rem;
+  }
+  .marca { display: flex; align-items: center; gap: 1rem; }
+  .avatar {
+    width: 56px; height: 56px;
+    border-radius: 50%;
+    background: var(--verde-suave);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 1.8rem;
+    border: 2px solid var(--verde-claro);
+    flex-shrink: 0;
+  }
+  .marca h1 {
+    font-size: 2rem;
+    color: var(--verde);
+    letter-spacing: 0.3px;
+    line-height: 1;
+  }
+  .marca h1 span { color: var(--texto); font-weight: 400; font-style: italic; }
+  .marca .sub {
+    font-size: 0.85rem;
+    color: var(--texto-sec);
+    margin-top: 0.25rem;
+  }
+  .header-info {
+    text-align: right;
+    font-size: 0.85rem;
+    color: var(--texto-sec);
+  }
+  .header-info .hoje-data {
+    font-family: 'Cormorant Garamond', serif;
+    font-size: 1.3rem;
+    color: var(--verde-escuro);
+    text-transform: capitalize;
+  }
+
+  nav {
+    background: var(--bege-card);
+    border-bottom: 1px solid var(--border);
+    padding: 0 2rem;
+    display: flex;
+    gap: 0;
+    position: sticky;
+    top: 0;
+    z-index: 20;
+    overflow-x: auto;
+  }
+  nav button {
+    background: transparent;
+    border: none;
+    border-bottom: 3px solid transparent;
+    padding: 0.9rem 1.25rem;
+    font-family: 'Jost', sans-serif;
+    font-size: 0.95rem;
+    font-weight: 500;
+    color: var(--texto-sec);
+    cursor: pointer;
+    transition: all 0.15s;
+    white-space: nowrap;
+  }
+  nav button:hover { color: var(--verde); background: var(--bege-hover); }
+  nav button.ativo {
+    color: var(--verde-escuro);
+    border-bottom-color: var(--verde);
+    font-weight: 600;
+  }
+
+  main {
+    max-width: 1100px;
+    margin: 0 auto;
+    padding: 2rem;
+  }
+  .aba { display: none; }
+  .aba.ativa { display: block; animation: fade 0.2s ease; }
+  @keyframes fade { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }
+
+  .titulo-aba {
+    font-size: 1.9rem;
+    color: var(--verde-escuro);
+    margin-bottom: 0.25rem;
+  }
+  .subtitulo-aba {
+    color: var(--texto-sec);
+    margin-bottom: 1.5rem;
+    font-size: 0.95rem;
+  }
+
+  .card {
+    background: var(--bege-card);
+    border: 1px solid var(--border-suave);
+    border-radius: 12px;
+    padding: 1.25rem;
+    margin-bottom: 1rem;
+    transition: box-shadow 0.15s;
+  }
+  .card.destaque { border-color: var(--verde-claro); box-shadow: 0 4px 16px rgba(74,122,58,0.08); }
+
+  /* Resumo Freddy */
+  .resumo-freddy {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 0.75rem;
+    margin-bottom: 1.5rem;
+  }
+  .stat {
+    background: var(--bege-card);
+    border: 1px solid var(--border-suave);
+    border-radius: 10px;
+    padding: 0.9rem 1rem;
+  }
+  .stat .rot { font-size: 0.75rem; color: var(--texto-fraco); text-transform: uppercase; letter-spacing: 1px; }
+  .stat .val { font-family: 'Cormorant Garamond', serif; font-size: 1.5rem; color: var(--verde-escuro); }
+  .stat .val small { font-family: 'Jost', sans-serif; font-size: 0.85rem; color: var(--texto-sec); }
+
+  /* Doses de hoje */
+  .dose {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.75rem;
+    padding: 0.85rem 1rem;
+    background: var(--bege-card);
+    border: 1px solid var(--border-suave);
+    border-radius: 10px;
+    margin-bottom: 0.5rem;
+    transition: all 0.2s;
+  }
+  .dose:hover { background: #fdfcf8; }
+  .dose.feita {
+    background: var(--feito-bg);
+    border-color: var(--feito);
+    opacity: 0.75;
+  }
+  .dose.feita .nome-med { text-decoration: line-through; color: var(--texto-sec); }
+  .dose .checkbox {
+    width: 24px; height: 24px;
+    border: 2px solid var(--border);
+    border-radius: 6px;
+    cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    background: white;
+    flex-shrink: 0;
+    margin-top: 2px;
+    font-size: 14px;
+    color: white;
+    transition: all 0.15s;
+  }
+  .dose.feita .checkbox {
+    background: var(--feito);
+    border-color: var(--feito);
+  }
+  .dose .info { flex: 1; min-width: 0; }
+  .dose .nome-med {
+    font-weight: 600;
+    color: var(--texto);
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+  }
+  .dose .detalhes {
+    font-size: 0.85rem;
+    color: var(--texto-sec);
+    margin-top: 0.2rem;
+  }
+  .dose .horario {
+    font-family: 'Cormorant Garamond', serif;
+    font-size: 1.15rem;
+    color: var(--verde-escuro);
+    font-weight: 600;
+    min-width: 60px;
+    text-align: right;
+  }
+  .dose.atrasada:not(.feita) .horario { color: var(--pendente); }
+  .dose.atrasada:not(.feita) { border-left: 4px solid var(--pendente); }
+
+  .tag {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 10px;
+    font-size: 0.7rem;
+    font-weight: 500;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+  .tag-oral { background: var(--oral-bg); color: #8c6820; }
+  .tag-injec { background: var(--injec-bg); color: var(--injec); }
+  .tag-topico { background: var(--topico-bg); color: #4a6a85; }
+  .tag-banho { background: var(--banho-bg); color: var(--banho); }
+
+  .grupo-titulo {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin: 1.25rem 0 0.5rem;
+    color: var(--verde-escuro);
+    font-family: 'Cormorant Garamond', serif;
+    font-size: 1.35rem;
+    font-weight: 600;
+  }
+  .grupo-titulo .contador {
+    background: var(--verde-suave);
+    color: var(--verde-escuro);
+    font-family: 'Jost', sans-serif;
+    font-size: 0.75rem;
+    padding: 2px 8px;
+    border-radius: 10px;
+    font-weight: 500;
+  }
+
+  /* Semana */
+  .semana-nav {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 1rem;
+    gap: 0.5rem;
+  }
+  .semana-nav button {
+    background: var(--bege-card);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 0.5rem 0.9rem;
+    cursor: pointer;
+    font-family: inherit;
+    color: var(--verde);
+    font-weight: 500;
+  }
+  .semana-nav button:hover { background: var(--bege-hover); }
+  .semana-titulo {
+    font-family: 'Cormorant Garamond', serif;
+    font-size: 1.3rem;
+    color: var(--verde-escuro);
+    text-transform: capitalize;
+    text-align: center;
+    flex: 1;
+  }
+
+  .grid-semana {
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    gap: 0.5rem;
+  }
+  @media (max-width: 720px) {
+    .grid-semana { grid-template-columns: 1fr; }
+  }
+  .dia {
+    background: var(--bege-card);
+    border: 1px solid var(--border-suave);
+    border-radius: 10px;
+    padding: 0.75rem;
+    min-height: 140px;
+  }
+  .dia.hoje {
+    border-color: var(--verde);
+    background: #fdfcf5;
+    box-shadow: 0 2px 8px rgba(74,122,58,0.1);
+  }
+  .dia-cabecalho {
+    font-family: 'Cormorant Garamond', serif;
+    font-weight: 600;
+    color: var(--verde-escuro);
+    padding-bottom: 0.4rem;
+    border-bottom: 1px solid var(--border-suave);
+    margin-bottom: 0.5rem;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    text-transform: capitalize;
+  }
+  .dia.hoje .dia-cabecalho { color: var(--verde); }
+  .dia-cabecalho .num { font-size: 1.4rem; }
+  .dia-cabecalho .dsem { font-size: 0.75rem; color: var(--texto-sec); text-transform: uppercase; letter-spacing: 0.5px; font-family: 'Jost', sans-serif; }
+  .dia-evento {
+    font-size: 0.75rem;
+    padding: 3px 6px;
+    border-radius: 5px;
+    margin-bottom: 3px;
+    background: var(--verde-suave);
+    color: var(--verde-escuro);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 4px;
+  }
+  .dia-evento.feito { opacity: 0.5; text-decoration: line-through; }
+  .dia-evento.oral { background: var(--oral-bg); color: #8c6820; }
+  .dia-evento.topico { background: var(--topico-bg); color: #4a6a85; }
+  .dia-evento.banho { background: var(--banho-bg); color: var(--banho); }
+  .dia-evento.injec { background: var(--injec-bg); color: var(--injec); }
+  .dia-evento .h { font-weight: 600; }
+
+  /* Cronograma / medicamentos */
+  .med-card {
+    background: var(--bege-card);
+    border: 1px solid var(--border-suave);
+    border-radius: 12px;
+    padding: 1.1rem 1.25rem;
+    margin-bottom: 0.75rem;
+    transition: box-shadow 0.15s;
+  }
+  .med-card:hover { box-shadow: 0 2px 12px rgba(0,0,0,0.05); }
+  .med-cabecalho {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 1rem;
+    flex-wrap: wrap;
+    margin-bottom: 0.5rem;
+  }
+  .med-nome {
+    font-family: 'Cormorant Garamond', serif;
+    font-size: 1.3rem;
+    color: var(--verde-escuro);
+    font-weight: 600;
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    flex-wrap: wrap;
+  }
+  .med-nome .num {
+    background: var(--verde);
+    color: white;
+    width: 26px; height: 26px;
+    border-radius: 50%;
+    display: inline-flex;
+    align-items: center; justify-content: center;
+    font-family: 'Jost', sans-serif;
+    font-size: 0.85rem;
+    font-weight: 600;
+  }
+  .med-info {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+    gap: 0.75rem;
+    margin: 0.75rem 0;
+    padding: 0.75rem;
+    background: #f9f7f2;
+    border-radius: 8px;
+  }
+  .med-info .campo .rot { font-size: 0.7rem; color: var(--texto-fraco); text-transform: uppercase; letter-spacing: 0.5px; }
+  .med-info .campo .valor { color: var(--texto); font-weight: 500; }
+  .med-instrucao {
+    background: #fdfcf5;
+    border-left: 3px solid var(--verde-claro);
+    padding: 0.6rem 0.85rem;
+    border-radius: 4px;
+    font-size: 0.88rem;
+    color: var(--texto);
+    font-style: italic;
+  }
+  .med-progresso {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin-top: 0.5rem;
+    font-size: 0.8rem;
+    color: var(--texto-sec);
+  }
+  .med-progresso .barra {
+    flex: 1;
+    height: 6px;
+    background: var(--border-suave);
+    border-radius: 3px;
+    overflow: hidden;
+  }
+  .med-progresso .barra-fill {
+    height: 100%;
+    background: var(--verde-claro);
+    transition: width 0.3s;
+  }
+
+  /* Botões */
+  .btn {
+    background: var(--verde);
+    color: white;
+    border: none;
+    border-radius: 8px;
+    padding: 0.55rem 1rem;
+    font-family: 'Jost', sans-serif;
+    font-size: 0.9rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+  .btn:hover { background: var(--verde-escuro); }
+  .btn.sec {
+    background: transparent;
+    color: var(--verde);
+    border: 1px solid var(--verde);
+  }
+  .btn.sec:hover { background: var(--verde-suave); }
+  .btn.pequeno { padding: 0.35rem 0.7rem; font-size: 0.8rem; }
+  .btn.alerta { background: var(--pendente); }
+  .btn.alerta:hover { background: #a04520; }
+
+  .barra-acoes {
+    display: flex;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+    margin-bottom: 1rem;
+  }
+
+  /* Vazio */
+  .vazio {
+    text-align: center;
+    padding: 2rem 1rem;
+    color: var(--texto-fraco);
+    font-style: italic;
+  }
+
+  /* Nota vet */
+  .vet-card {
+    background: linear-gradient(135deg, #fdfcf5 0%, #f7f3ea 100%);
+    border: 1px solid var(--verde-claro);
+    border-radius: 12px;
+    padding: 1.25rem;
+    margin-bottom: 1.5rem;
+  }
+  .vet-card .rotulo {
+    font-size: 0.75rem;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    color: var(--verde);
+    font-weight: 500;
+  }
+  .vet-card .nome {
+    font-family: 'Cormorant Garamond', serif;
+    font-size: 1.4rem;
+    color: var(--verde-escuro);
+    margin: 0.2rem 0 0.5rem;
+  }
+  .vet-card .detalhes {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 1rem 2rem;
+    font-size: 0.85rem;
+    color: var(--texto-sec);
+  }
+
+  /* Histórico */
+  .hist-item {
+    display: flex;
+    gap: 0.75rem;
+    padding: 0.6rem 0.85rem;
+    border-bottom: 1px solid var(--border-suave);
+    font-size: 0.9rem;
+  }
+  .hist-item:last-child { border-bottom: none; }
+  .hist-item .quando {
+    color: var(--texto-fraco);
+    font-family: 'Cormorant Garamond', serif;
+    min-width: 130px;
+  }
+  .hist-item .o-que { flex: 1; }
+  .hist-item .acao {
+    color: var(--texto-fraco);
+    font-size: 0.75rem;
+  }
+
+  /* Anotações */
+  .nota-input {
+    width: 100%;
+    padding: 0.75rem;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    font-family: 'Jost', sans-serif;
+    font-size: 0.95rem;
+    resize: vertical;
+    background: var(--bege-card);
+  }
+  .nota-input:focus { outline: none; border-color: var(--verde); }
+  .nota {
+    background: var(--bege-card);
+    border: 1px solid var(--border-suave);
+    border-radius: 8px;
+    padding: 0.9rem 1rem;
+    margin-bottom: 0.5rem;
+  }
+  .nota .quando { font-size: 0.75rem; color: var(--texto-fraco); margin-bottom: 0.3rem; }
+  .nota .texto { color: var(--texto); white-space: pre-wrap; }
+  .nota .apagar { float: right; background: none; border: none; color: var(--texto-fraco); cursor: pointer; font-size: 0.8rem; }
+  .nota .apagar:hover { color: var(--pendente); }
+
+  /* Toast */
+  .toast {
+    position: fixed;
+    bottom: 2rem;
+    left: 50%;
+    transform: translateX(-50%);
+    background: var(--verde-escuro);
+    color: white;
+    padding: 0.75rem 1.25rem;
+    border-radius: 8px;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.15);
+    z-index: 100;
+    opacity: 0;
+    transition: opacity 0.3s, transform 0.3s;
+    pointer-events: none;
+  }
+  .toast.show { opacity: 1; transform: translateX(-50%) translateY(-4px); }
+
+  @media (max-width: 600px) {
+    header { padding: 1rem; }
+    main { padding: 1rem; }
+    nav { padding: 0 1rem; }
+    nav button { padding: 0.75rem 0.9rem; font-size: 0.85rem; }
+    .marca h1 { font-size: 1.5rem; }
+    .titulo-aba { font-size: 1.5rem; }
+    .header-info { text-align: left; width: 100%; }
+  }
+  @media print {
+    nav, .barra-acoes, .checkbox, .apagar { display: none !important; }
+    header { background: white; }
+    .card, .med-card, .dia { break-inside: avoid; }
+  }
+
+  /* Tela de cadeado */
+  #lock {
+    position: fixed;
+    inset: 0;
+    background: linear-gradient(135deg, #4a7a3a 0%, #335526 100%);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 9999;
+    color: white;
+    font-family: 'Jost', sans-serif;
+  }
+  #lock .box {
+    background: rgba(255,255,255,0.08);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    border: 1px solid rgba(255,255,255,0.15);
+    border-radius: 20px;
+    padding: 2.5rem 2rem;
+    text-align: center;
+    max-width: 340px;
+    width: 90%;
+  }
+  #lock .emoji { font-size: 3rem; margin-bottom: 0.5rem; }
+  #lock h1 {
+    font-family: 'Cormorant Garamond', serif;
+    font-size: 2rem;
+    margin-bottom: 0.25rem;
+    letter-spacing: 0.3px;
+  }
+  #lock .sub {
+    color: rgba(255,255,255,0.75);
+    font-size: 0.9rem;
+    margin-bottom: 1.5rem;
+  }
+  #lock input {
+    width: 100%;
+    padding: 0.85rem 1rem;
+    border: 1px solid rgba(255,255,255,0.25);
+    border-radius: 10px;
+    background: rgba(255,255,255,0.12);
+    color: white;
+    font-size: 1.2rem;
+    text-align: center;
+    letter-spacing: 4px;
+    font-family: inherit;
+    margin-bottom: 0.75rem;
+  }
+  #lock input::placeholder { color: rgba(255,255,255,0.5); letter-spacing: 2px; }
+  #lock input:focus { outline: none; border-color: white; background: rgba(255,255,255,0.18); }
+  #lock button {
+    width: 100%;
+    padding: 0.85rem;
+    background: white;
+    color: var(--verde-escuro);
+    border: none;
+    border-radius: 10px;
+    font-family: inherit;
+    font-size: 1rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: opacity 0.15s;
+  }
+  #lock button:hover { opacity: 0.9; }
+  #lock .erro {
+    color: #ffd0d0;
+    font-size: 0.85rem;
+    margin-top: 0.5rem;
+    min-height: 1.2rem;
+  }
+  body.locked { overflow: hidden; }
+  body.locked > *:not(#lock):not(script) { display: none !important; }
+</style>
+</head>
+<body class="locked">
+
+<div id="lock">
+  <div class="box">
+    <div class="emoji">🐶🔒</div>
+    <h1>Cuidados do Freddy</h1>
+    <div class="sub">Digite a senha para continuar</div>
+    <form id="lock-form" autocomplete="off">
+      <input type="password" id="lock-input" inputmode="numeric" placeholder="senha" autofocus>
+      <button type="submit">Destravar</button>
+      <div class="erro" id="lock-erro"></div>
+    </form>
+  </div>
+</div>
+
+<script>
+(function(){
+  const SENHA_HASH = '12d9634a066ef75f5c94fc8b7cc77250f4fbf254b79fe7252e36dc22d0b6d40c';
+  const UNLOCK_KEY = 'freddy-unlocked-v1';
+
+  async function sha256(s) {
+    const enc = new TextEncoder().encode(s);
+    const buf = await crypto.subtle.digest('SHA-256', enc);
+    return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2,'0')).join('');
+  }
+
+  function destravar() {
+    document.body.classList.remove('locked');
+    const lock = document.getElementById('lock');
+    if (lock) lock.style.display = 'none';
+    try { localStorage.setItem(UNLOCK_KEY, '1'); } catch(e){}
+  }
+
+  // Já destravou antes neste aparelho?
+  try {
+    if (localStorage.getItem(UNLOCK_KEY) === '1') {
+      destravar();
+      return;
+    }
+  } catch(e){}
+
+  window.addEventListener('DOMContentLoaded', () => {
+    const form = document.getElementById('lock-form');
+    const input = document.getElementById('lock-input');
+    const erro = document.getElementById('lock-erro');
+    if (!form) return;
+    setTimeout(() => input && input.focus(), 100);
+
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      erro.textContent = '';
+      const val = input.value.trim();
+      if (!val) return;
+      const h = await sha256(val);
+      if (h === SENHA_HASH) {
+        destravar();
+      } else {
+        erro.textContent = 'Senha incorreta';
+        input.value = '';
+        input.focus();
+      }
+    });
+  });
+})();
+</script>
+
+<header>
+  <div class="marca">
+    <div class="avatar">🐶</div>
+    <div>
+      <h1>Freddy <span>· cuidados</span></h1>
+      <div class="sub">Shih Tzu · 14 anos · 4,35 kg · macho castrado</div>
+    </div>
+  </div>
+  <div class="header-info">
+    <div class="hoje-data" id="hoje-data">—</div>
+    <div id="hoje-resumo">—</div>
+    <a href="#" id="btn-trancar" style="font-size:0.75rem; color:var(--texto-fraco); text-decoration:none; margin-top:0.25rem; display:inline-block;">🔒 trancar</a>
+  </div>
+</header>
+
+<nav>
+  <button data-aba="hoje" class="ativo">Hoje</button>
+  <button data-aba="semana">Semana</button>
+  <button data-aba="meds">Medicamentos</button>
+  <button data-aba="banhos">Banhos</button>
+  <button data-aba="anotacoes">Anotações</button>
+  <button data-aba="historico">Histórico</button>
+  <button data-aba="notif">🔔 Notificações</button>
+</nav>
+
+<main>
+
+  <!-- HOJE -->
+  <section class="aba ativa" id="aba-hoje">
+    <h2 class="titulo-aba">Hoje</h2>
+    <div class="subtitulo-aba" id="hoje-sub"></div>
+
+    <div class="resumo-freddy">
+      <div class="stat">
+        <div class="rot">Doses de hoje</div>
+        <div class="val" id="stat-doses">0 <small>a dar</small></div>
+      </div>
+      <div class="stat">
+        <div class="rot">Já dado hoje</div>
+        <div class="val" id="stat-feitas">0 <small>de 0</small></div>
+      </div>
+      <div class="stat">
+        <div class="rot">Próxima dose</div>
+        <div class="val" id="stat-proxima">—</div>
+      </div>
+      <div class="stat">
+        <div class="rot">Próximo banho</div>
+        <div class="val" id="stat-banho">—</div>
+      </div>
+    </div>
+
+    <div id="hoje-lista"></div>
+  </section>
+
+  <!-- SEMANA -->
+  <section class="aba" id="aba-semana">
+    <h2 class="titulo-aba">Semana</h2>
+    <div class="subtitulo-aba">Visão dos 7 dias — clique num item para marcar como feito.</div>
+
+    <div class="semana-nav">
+      <button id="sem-ant">← Anterior</button>
+      <div class="semana-titulo" id="sem-titulo">—</div>
+      <button id="sem-prox">Próxima →</button>
+    </div>
+    <div class="grid-semana" id="grid-semana"></div>
+  </section>
+
+  <!-- MEDICAMENTOS -->
+  <section class="aba" id="aba-meds">
+    <h2 class="titulo-aba">Medicamentos</h2>
+    <div class="subtitulo-aba">Prescrição de 28/07/2026 — Dr. Douglas Moreira Teixeira</div>
+
+    <div class="vet-card">
+      <div class="rotulo">Veterinário Responsável</div>
+      <div class="nome">Dr. Douglas Moreira Teixeira</div>
+      <div class="detalhes">
+        <span><strong>Especialidade:</strong> Dermatologia Veterinária</span>
+        <span><strong>CRMV-RS:</strong> 23.179</span>
+        <span><strong>Cel:</strong> (51) 99004-9026</span>
+        <span><strong>E-mail:</strong> douglas.teixeu@gmail.com</span>
+      </div>
+    </div>
+
+    <div class="barra-acoes">
+      <button class="btn sec" onclick="window.print()">🖨️ Imprimir</button>
+      <button class="btn sec" onclick="exportarBackup()">💾 Exportar dados</button>
+      <button class="btn sec" onclick="importarBackup()">📥 Importar dados</button>
+      <input type="file" id="importar-file" style="display:none" accept="application/json">
+    </div>
+
+    <div id="meds-lista"></div>
+  </section>
+
+  <!-- BANHOS -->
+  <section class="aba" id="aba-banhos">
+    <h2 class="titulo-aba">Banhos & tópicos</h2>
+    <div class="subtitulo-aba">Ordem correta dos produtos, sem se atrapalhar.</div>
+    <div id="banhos-conteudo"></div>
+  </section>
+
+  <!-- ANOTAÇÕES -->
+  <section class="aba" id="aba-anotacoes">
+    <h2 class="titulo-aba">Anotações</h2>
+    <div class="subtitulo-aba">Registre reações, observações, dúvidas para o vet.</div>
+
+    <div class="card">
+      <textarea id="nota-nova" class="nota-input" rows="3" placeholder="Ex.: Freddy coçando menos hoje. Ou: pergunta para o Dr. Douglas..."></textarea>
+      <div style="margin-top: 0.5rem;">
+        <button class="btn" onclick="adicionarNota()">Adicionar anotação</button>
+      </div>
+    </div>
+
+    <div id="notas-lista"></div>
+  </section>
+
+  <!-- NOTIFICAÇÕES -->
+  <section class="aba" id="aba-notif">
+    <h2 class="titulo-aba">🔔 Notificações</h2>
+    <div class="subtitulo-aba">Configure lembretes automáticos das doses do Freddy no seu celular.</div>
+
+    <div class="card destaque">
+      <div style="font-family:'Cormorant Garamond',serif; font-size:1.3rem; color:var(--verde-escuro); margin-bottom:0.5rem;">
+        Instalar como app no celular
+      </div>
+      <p style="color:var(--texto-sec); font-size:0.9rem; margin-bottom:0.75rem;">
+        Para receber notificações mesmo com o app fechado, instale como app:
+      </p>
+      <ul style="margin-left:1.25rem; color:var(--texto); font-size:0.9rem; line-height:1.7;">
+        <li><strong>Android (Chrome):</strong> menu ⋮ → <em>“Instalar app”</em> ou <em>“Adicionar à tela inicial”</em>.</li>
+        <li><strong>iPhone (Safari):</strong> botão compartilhar 􀈂 → <em>“Adicionar à Tela de Início”</em>.</li>
+      </ul>
+      <p style="color:var(--texto-fraco); font-size:0.8rem; margin-top:0.75rem;">
+        <em>Detalhe:</em> notificações com app fechado funcionam melhor no Android. No iPhone as notificações chegam quando o app está aberto ou instalado como PWA (iOS 16.4+).
+      </p>
+    </div>
+
+    <div class="card">
+      <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:1rem;">
+        <div>
+          <div style="font-family:'Cormorant Garamond',serif; font-size:1.25rem; color:var(--verde-escuro);">
+            Permissão do navegador
+          </div>
+          <div id="notif-status" style="color:var(--texto-sec); font-size:0.9rem; margin-top:0.25rem;">Verificando…</div>
+        </div>
+        <button id="btn-permitir" class="btn">Ativar notificações</button>
+      </div>
+    </div>
+
+    <div class="card" id="config-notif">
+      <div style="font-family:'Cormorant Garamond',serif; font-size:1.25rem; color:var(--verde-escuro); margin-bottom:0.75rem;">
+        Configurações
+      </div>
+
+      <label style="display:flex; align-items:center; gap:0.6rem; margin-bottom:0.75rem; cursor:pointer;">
+        <input type="checkbox" id="cfg-ativo" style="width:18px;height:18px;">
+        <span>Enviar lembretes das doses</span>
+      </label>
+
+      <div style="margin-bottom:0.75rem;">
+        <label style="display:block; font-size:0.85rem; color:var(--texto-sec); margin-bottom:0.25rem;">
+          Antecedência do lembrete (minutos antes da dose)
+        </label>
+        <select id="cfg-antec" style="padding:0.5rem; border-radius:6px; border:1px solid var(--border); font-family:inherit;">
+          <option value="0">No horário exato</option>
+          <option value="5">5 minutos antes</option>
+          <option value="10" selected>10 minutos antes</option>
+          <option value="15">15 minutos antes</option>
+          <option value="30">30 minutos antes</option>
+          <option value="60">1 hora antes</option>
+        </select>
+      </div>
+
+      <label style="display:flex; align-items:center; gap:0.6rem; margin-bottom:0.75rem; cursor:pointer;">
+        <input type="checkbox" id="cfg-repetir" style="width:18px;height:18px;">
+        <span>Lembrar de novo 30 min depois se não marcar como dado</span>
+      </label>
+
+      <div style="display:flex; gap:0.5rem; flex-wrap:wrap; margin-top:1rem;">
+        <button class="btn" onclick="reagendarTodas()">Reagendar próximas doses</button>
+        <button class="btn sec" onclick="testarNotif()">Testar notificação</button>
+        <button class="btn sec" onclick="limparAgendadas()">Cancelar agendadas</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <div style="font-family:'Cormorant Garamond',serif; font-size:1.25rem; color:var(--verde-escuro); margin-bottom:0.5rem;">
+        Próximas notificações
+      </div>
+      <div id="lista-agendadas" style="font-size:0.9rem; color:var(--texto-sec);">—</div>
+    </div>
+  </section>
+
+  <!-- HISTÓRICO -->
+  <section class="aba" id="aba-historico">
+    <h2 class="titulo-aba">Histórico</h2>
+    <div class="subtitulo-aba">Tudo o que já foi administrado — últimas 200 ações.</div>
+
+    <div class="barra-acoes">
+      <button class="btn sec" onclick="limparHistorico()">Limpar histórico</button>
+    </div>
+
+    <div class="card" id="historico-lista"></div>
+  </section>
+
+</main>
+
+<div class="toast" id="toast">—</div>
+
+<script>
+/* =========================================================
+   DADOS DA RECEITA — FREDDY 28/07/2026
+   Dr. Douglas Moreira Teixeira - Dermatologista Veterinário
+   ========================================================= */
+
+const INICIO_TRATAMENTO = '2026-07-28';
+
+// Cada medicamento tem uma função "gerarDoses(inicio, hoje)" que devolve
+// {data: 'YYYY-MM-DD', hora: 'HH:MM', obs?: string}[] de todas as doses previstas.
+const MEDS = [
+  {
+    id: 'convenia',
+    numero: 1,
+    nome: 'Convenia',
+    tipo: 'injec',
+    tipoLabel: 'Injetável',
+    dosagem: '0,5 mL',
+    via: 'Subcutânea',
+    frequencia: 'Dose única',
+    valor: 'R$ 220,00 c/ aplicação',
+    instrucao: 'Aplicar 0,5 mL por injeção subcutânea em dose única. Aplicado na PoA Pet.',
+    ativo: true,
+    gerarDoses: () => [{ data: '2026-07-29', hora: '15:00', obs: 'Aplicado na PoA Pet' }]
+  },
+  {
+    id: 'cortavance',
+    numero: 2,
+    nome: 'Cortavance spray',
+    tipo: 'topico',
+    tipoLabel: 'Tópico',
+    dosagem: '2 borrifadas',
+    via: 'Interdígitos das 4 patas',
+    frequencia: 'Quartas e sábados por 15 dias',
+    instrucao: 'Aplicar 2 borrifadas nos interdígitos dos quatro membros nas quartas e sábados por 15 dias. Colocar o colar elisabetano por 10 minutos após cada aplicação.',
+    ativo: true,
+    gerarDoses: () => {
+      // Datas anotadas: 29/07 (4ªF), 01/08 (sáb), 05/08 (4ªF), 08/08 (sáb)
+      return [
+        { data: '2026-07-29', hora: '20:00' },
+        { data: '2026-08-01', hora: '20:00' },
+        { data: '2026-08-05', hora: '20:00' },
+        { data: '2026-08-08', hora: '20:00' },
+      ];
+    }
+  },
+  {
+    id: 'alcort',
+    numero: 3,
+    nome: 'Alcort 5mg',
+    tipo: 'oral',
+    tipoLabel: 'Oral',
+    dosagem: '½ comprimido',
+    via: 'Oral',
+    frequencia: 'A cada 24h por 8 dias, depois a cada 48h por mais 8 dias',
+    instrucao: 'Dar ½ comprimido a cada 24 horas por 8 dias. Posteriormente, dar ½ comprimido a cada 48 horas (em dias alternados) por mais 8 dias até completar 16 dias de tratamento.',
+    ativo: true,
+    gerarDoses: () => {
+      // Anotado: 28/07-noite, 29/07-12h, 30/07, 31/07, 01/08, 02/08, 03/08, 04/08
+      // Depois: 06/08, 08/08, 10/08, 12/08, 14/08, 16/08, 18/08, 20/08
+      return [
+        { data: '2026-07-28', hora: '22:00' },
+        { data: '2026-07-29', hora: '22:00' },
+        { data: '2026-07-30', hora: '22:00' },
+        { data: '2026-07-31', hora: '22:00' },
+        { data: '2026-08-01', hora: '22:00' },
+        { data: '2026-08-02', hora: '22:00' },
+        { data: '2026-08-03', hora: '22:00' },
+        { data: '2026-08-04', hora: '22:00' },
+        { data: '2026-08-06', hora: '22:00' },
+        { data: '2026-08-08', hora: '22:00' },
+        { data: '2026-08-10', hora: '22:00' },
+        { data: '2026-08-12', hora: '22:00' },
+        { data: '2026-08-14', hora: '22:00' },
+        { data: '2026-08-16', hora: '22:00' },
+        { data: '2026-08-18', hora: '22:00' },
+        { data: '2026-08-20', hora: '22:00' },
+      ];
+    }
+  },
+  {
+    id: 'apoquel',
+    numero: 4,
+    nome: 'Apoquel 3,6mg',
+    tipo: 'oral',
+    tipoLabel: 'Oral',
+    dosagem: '½ comprimido',
+    via: 'Oral',
+    frequencia: 'A cada 12h — iniciar após os 8 primeiros dias do Alcort',
+    instrucao: 'Dar ½ comprimido a cada 12 horas até nova recomendação. Iniciar após os primeiros 8 dias do Alcort (a partir de 05/08).',
+    ativo: true,
+    inicio: '2026-08-05',
+    // Gera doses até HOJE+30 dias (uso contínuo)
+    gerarDoses: (hoje) => {
+      const doses = [];
+      const inicio = new Date('2026-08-05T10:00:00');
+      const limite = new Date(hoje);
+      limite.setDate(limite.getDate() + 30);
+      const cursor = new Date(inicio);
+      while (cursor <= limite) {
+        doses.push({ data: fmtISO(cursor), hora: '10:00' });
+        const noite = new Date(cursor); noite.setHours(22, 0);
+        doses.push({ data: fmtISO(noite), hora: '22:00' });
+        cursor.setDate(cursor.getDate() + 1);
+      }
+      return doses;
+    }
+  },
+  {
+    id: 'dermaskin',
+    numero: 5,
+    nome: 'Derma Skin PEA',
+    tipo: 'oral',
+    tipoLabel: 'Oral',
+    dosagem: '1 comprimido',
+    via: 'Oral',
+    frequencia: 'Diário — uso contínuo',
+    instrucao: 'Dar 1 comprimido ao dia em uso contínuo.',
+    ativo: true,
+    gerarDoses: (hoje) => {
+      const doses = [];
+      const inicio = new Date(INICIO_TRATAMENTO + 'T09:00:00');
+      const limite = new Date(hoje); limite.setDate(limite.getDate() + 30);
+      const cursor = new Date(inicio);
+      while (cursor <= limite) {
+        doses.push({ data: fmtISO(cursor), hora: '09:00' });
+        cursor.setDate(cursor.getDate() + 1);
+      }
+      return doses;
+    }
+  },
+  {
+    id: 'complederm',
+    numero: 6,
+    nome: 'Complederm',
+    tipo: 'oral',
+    tipoLabel: 'Oral',
+    dosagem: '1 sachê (4 mL)',
+    via: 'Adicionar na ração',
+    frequencia: '1x/dia por 60 dias, depois em dias alternados',
+    instrucao: 'Inicialmente adicionar 1 sachê na ração uma vez ao dia, por 60 dias. Posteriormente, adicionar 1 sachê na ração a cada 48 horas (em dias alternados) em uso contínuo.',
+    ativo: true,
+    gerarDoses: (hoje) => {
+      const doses = [];
+      const inicio = new Date(INICIO_TRATAMENTO + 'T09:00:00');
+      const fase1Fim = new Date(inicio); fase1Fim.setDate(fase1Fim.getDate() + 59); // 60 dias
+      const limite = new Date(hoje); limite.setDate(limite.getDate() + 30);
+      const cursor = new Date(inicio);
+      // fase 1: diário
+      while (cursor <= fase1Fim && cursor <= limite) {
+        doses.push({ data: fmtISO(cursor), hora: '09:00' });
+        cursor.setDate(cursor.getDate() + 1);
+      }
+      // fase 2: alternado
+      while (cursor <= limite) {
+        doses.push({ data: fmtISO(cursor), hora: '09:00' });
+        cursor.setDate(cursor.getDate() + 2);
+      }
+      return doses;
+    }
+  },
+  {
+    id: 'simparic',
+    numero: 7,
+    nome: 'Simparic 10mg',
+    tipo: 'oral',
+    tipoLabel: 'Oral · antipulgas',
+    dosagem: '1 comprimido',
+    via: 'Oral',
+    frequencia: 'A cada 35 dias — uso contínuo',
+    instrucao: 'Dar 1 comprimido a cada 35 dias em uso contínuo. (Cães de 2,6 a 5 kg.)',
+    ativo: true,
+    gerarDoses: (hoje) => {
+      const doses = [];
+      const inicio = new Date(INICIO_TRATAMENTO + 'T09:00:00');
+      const limite = new Date(hoje); limite.setDate(limite.getDate() + 90);
+      const cursor = new Date(inicio);
+      while (cursor <= limite) {
+        doses.push({ data: fmtISO(cursor), hora: '09:00' });
+        cursor.setDate(cursor.getDate() + 35);
+      }
+      return doses;
+    }
+  },
+  {
+    id: 'sebotrat',
+    numero: 8,
+    nome: 'Sebotrat "O" xampu',
+    tipo: 'banho',
+    tipoLabel: 'Banho — 1º passo',
+    dosagem: 'Banho',
+    via: 'Aplicar como banho',
+    frequencia: 'Quartas e sábados por 30 dias',
+    instrucao: 'Aplicar sob a forma de banhos. Deixe ensaboado por 10 minutos e enxágue. Faça o procedimento às quartas e sábados por 30 dias.',
+    ativo: true,
+    gerarDoses: () => {
+      // Datas dos banhos quartas e sábados por 30 dias a partir de 29/07/2026 (quarta)
+      const doses = [];
+      const inicio = new Date('2026-07-29T18:00:00');
+      const fim = new Date(inicio); fim.setDate(fim.getDate() + 30);
+      const cursor = new Date(inicio);
+      while (cursor <= fim) {
+        const dow = cursor.getDay(); // 3 = quarta, 6 = sábado
+        if (dow === 3 || dow === 6) {
+          doses.push({ data: fmtISO(cursor), hora: '18:00' });
+        }
+        cursor.setDate(cursor.getDate() + 1);
+      }
+      return doses;
+    }
+  },
+  {
+    id: 'hidrapet',
+    numero: 9,
+    nome: 'Hidrapet xampu',
+    tipo: 'banho',
+    tipoLabel: 'Banho — 2º passo',
+    dosagem: 'Banho',
+    via: 'Após enxágue do Sebotrat',
+    frequencia: '1x/semana em uso contínuo',
+    instrucao: 'Imediatamente após o enxágue do Sebotrat "O", aplicar sob a forma de banhos. Deixar ensaboado por 10 minutos e enxaguar. Fazer o procedimento uma vez por semana em uso contínuo.',
+    ativo: true,
+    gerarDoses: (hoje) => {
+      // 1x/semana. Aos sábados, junto com o Sebotrat.
+      const doses = [];
+      const inicio = new Date('2026-08-01T18:00:00'); // primeiro sábado
+      const limite = new Date(hoje); limite.setDate(limite.getDate() + 60);
+      const cursor = new Date(inicio);
+      while (cursor <= limite) {
+        doses.push({ data: fmtISO(cursor), hora: '18:15' });
+        cursor.setDate(cursor.getDate() + 7);
+      }
+      return doses;
+    }
+  },
+  {
+    id: 'phisioderm-cond',
+    numero: 10,
+    nome: 'Phisioderm Condicionador',
+    tipo: 'banho',
+    tipoLabel: 'Banho — 3º passo',
+    dosagem: 'Aplicar no pelo molhado',
+    via: 'Após enxágue do Hidrapet',
+    frequencia: '1x/semana em uso contínuo',
+    instrucao: 'Imediatamente após o enxágue do Hidrapet xampú, aplicar o condicionador sobre o pelo molhado, espalhando por todo o corpo. Deixar agir por 5 minutos, enxaguar e secar com o secador levemente morno. Fazer o procedimento uma vez por semana em uso contínuo.',
+    ativo: true,
+    gerarDoses: (hoje) => {
+      const doses = [];
+      const inicio = new Date('2026-08-01T18:00:00');
+      const limite = new Date(hoje); limite.setDate(limite.getDate() + 60);
+      const cursor = new Date(inicio);
+      while (cursor <= limite) {
+        doses.push({ data: fmtISO(cursor), hora: '18:30' });
+        cursor.setDate(cursor.getDate() + 7);
+      }
+      return doses;
+    }
+  },
+];
+
+/* =========================================================
+   ESTADO PERSISTENTE
+   ========================================================= */
+const STORAGE_KEY = 'freddy-cuidados-v1';
+let estado = carregar();
+
+function carregar() {
+  const padrao = {
+    feitas: {}, notas: [], historico: [], semanaOffset: 0,
+    notif: { ativo: false, antecMin: 10, repetir: false }
+  };
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (!raw) return padrao;
+    const s = JSON.parse(raw);
+    s.feitas = s.feitas || {};
+    s.notas = s.notas || [];
+    s.historico = s.historico || [];
+    s.semanaOffset = 0;
+    s.notif = { ...padrao.notif, ...(s.notif || {}) };
+    return s;
+  } catch(e) {
+    return padrao;
+  }
+}
+function salvar() {
+  try { localStorage.setItem(STORAGE_KEY, JSON.stringify(estado)); }
+  catch(e) { toast('Erro ao salvar 😢'); }
+}
+
+/* =========================================================
+   HELPERS
+   ========================================================= */
+function fmtISO(d) {
+  const y = d.getFullYear();
+  const m = String(d.getMonth()+1).padStart(2,'0');
+  const dd = String(d.getDate()).padStart(2,'0');
+  return `${y}-${m}-${dd}`;
+}
+function hojeISO() { return fmtISO(new Date()); }
+function fmtBR(iso) {
+  const [y,m,d] = iso.split('-');
+  return `${d}/${m}/${y}`;
+}
+const DIAS_SEMANA = ['Domingo','Segunda','Terça','Quarta','Quinta','Sexta','Sábado'];
+const DIAS_SEMANA_CURTO = ['Dom','Seg','Ter','Qua','Qui','Sex','Sáb'];
+const MESES = ['janeiro','fevereiro','março','abril','maio','junho','julho','agosto','setembro','outubro','novembro','dezembro'];
+
+function agoraStr() {
+  const d = new Date();
+  return d.toLocaleString('pt-BR');
+}
+
+function keyDose(medId, data, hora) {
+  return `${medId}|${data}|${hora}`;
+}
+
+function todasDoses(hoje) {
+  const h = new Date(hoje + 'T12:00:00');
+  const todas = [];
+  for (const m of MEDS) {
+    if (!m.ativo) continue;
+    const doses = m.gerarDoses(h);
+    for (const d of doses) {
+      todas.push({ ...d, med: m });
+    }
+  }
+  return todas.sort((a,b) => (a.data+a.hora).localeCompare(b.data+b.hora));
+}
+
+function marcarDose(medId, data, hora, feita) {
+  const k = keyDose(medId, data, hora);
+  const med = MEDS.find(m => m.id === medId);
+  if (feita) {
+    estado.feitas[k] = new Date().toISOString();
+    estado.historico.unshift({
+      quando: new Date().toISOString(),
+      med: med.nome,
+      dose: `${med.dosagem} · ${data} ${hora}`,
+      acao: 'marcado como dado'
+    });
+  } else {
+    delete estado.feitas[k];
+    estado.historico.unshift({
+      quando: new Date().toISOString(),
+      med: med.nome,
+      dose: `${med.dosagem} · ${data} ${hora}`,
+      acao: 'desmarcado'
+    });
+  }
+  estado.historico = estado.historico.slice(0, 200);
+  salvar();
+  renderTudo();
+  toast(feita ? '✓ Marcado como dado' : 'Desmarcado');
+  // Cancela ou reagenda a notificação relacionada
+  if ('Notification' in window && Notification.permission === 'granted' && swReg) {
+    swReg.getNotifications({ tag: k }).then(ns => ns.forEach(n => n.close())).catch(()=>{});
+    swReg.getNotifications({ tag: k + '|rep' }).then(ns => ns.forEach(n => n.close())).catch(()=>{});
+  }
+}
+
+function toast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  clearTimeout(toast._t);
+  toast._t = setTimeout(() => t.classList.remove('show'), 1800);
+}
+
+/* =========================================================
+   RENDER — HOJE
+   ========================================================= */
+function renderHoje() {
+  const hoje = hojeISO();
+  const agora = new Date();
+  const doses = todasDoses(hoje).filter(d => d.data === hoje);
+
+  // header info
+  const d = new Date();
+  document.getElementById('hoje-data').textContent = `${d.getDate()} de ${MESES[d.getMonth()]}`;
+  document.getElementById('hoje-resumo').textContent = `${DIAS_SEMANA[d.getDay()]}`;
+
+  document.getElementById('hoje-sub').textContent = `${DIAS_SEMANA[d.getDay()]}, ${d.getDate()} de ${MESES[d.getMonth()]} de ${d.getFullYear()}`;
+
+  const feitas = doses.filter(x => estado.feitas[keyDose(x.med.id, x.data, x.hora)]);
+  const pendentes = doses.filter(x => !estado.feitas[keyDose(x.med.id, x.data, x.hora)]);
+
+  document.getElementById('stat-doses').innerHTML = `${pendentes.length} <small>a dar</small>`;
+  document.getElementById('stat-feitas').innerHTML = `${feitas.length} <small>de ${doses.length}</small>`;
+
+  // próxima dose
+  const proxima = pendentes.find(x => {
+    const [hh,mm] = x.hora.split(':').map(Number);
+    const t = new Date(hoje + 'T' + x.hora + ':00');
+    return t >= agora;
+  }) || pendentes[0];
+  document.getElementById('stat-proxima').innerHTML = proxima
+    ? `${proxima.hora} <small>· ${proxima.med.nome.split(' ')[0]}</small>`
+    : '<small>sem doses</small>';
+
+  // próximo banho
+  const proxBanho = todasDoses(hoje).find(x => x.med.tipo === 'banho' && x.data >= hoje && !estado.feitas[keyDose(x.med.id, x.data, x.hora)]);
+  document.getElementById('stat-banho').innerHTML = proxBanho
+    ? `${fmtBR(proxBanho.data).slice(0,5)} <small>· ${DIAS_SEMANA_CURTO[new Date(proxBanho.data + 'T12:00:00').getDay()]}</small>`
+    : '<small>—</small>';
+
+  // Lista de doses agrupadas
+  const cont = document.getElementById('hoje-lista');
+  cont.innerHTML = '';
+
+  if (doses.length === 0) {
+    cont.innerHTML = '<div class="card vazio">Nenhuma dose programada para hoje. 🌿</div>';
+    return;
+  }
+
+  // grupos: manhã / tarde / noite / banho
+  const grupos = [
+    { titulo: 'Manhã', filtro: x => x.hora < '12:00' && x.med.tipo !== 'banho' },
+    { titulo: 'Tarde', filtro: x => x.hora >= '12:00' && x.hora < '18:00' && x.med.tipo !== 'banho' },
+    { titulo: 'Noite', filtro: x => x.hora >= '18:00' && x.med.tipo !== 'banho' },
+    { titulo: 'Banho & tópicos', filtro: x => x.med.tipo === 'banho' || x.med.tipo === 'topico' },
+  ];
+
+  for (const g of grupos) {
+    const lista = doses.filter(g.filtro);
+    if (lista.length === 0) continue;
+    const feitasG = lista.filter(x => estado.feitas[keyDose(x.med.id, x.data, x.hora)]).length;
+    const h = document.createElement('div');
+    h.className = 'grupo-titulo';
+    h.innerHTML = `${g.titulo} <span class="contador">${feitasG}/${lista.length}</span>`;
+    cont.appendChild(h);
+    for (const dose of lista) {
+      cont.appendChild(renderDose(dose));
+    }
+  }
+}
+
+function renderDose(dose) {
+  const k = keyDose(dose.med.id, dose.data, dose.hora);
+  const feita = !!estado.feitas[k];
+  const agora = new Date();
+  const dt = new Date(dose.data + 'T' + dose.hora + ':00');
+  const atrasada = !feita && dt < agora && dose.data === hojeISO();
+
+  const el = document.createElement('div');
+  el.className = 'dose' + (feita ? ' feita' : '') + (atrasada ? ' atrasada' : '');
+  el.innerHTML = `
+    <div class="checkbox">${feita ? '✓' : ''}</div>
+    <div class="info">
+      <div class="nome-med">
+        ${dose.med.nome}
+        <span class="tag tag-${dose.med.tipo}">${dose.med.tipoLabel}</span>
+      </div>
+      <div class="detalhes">${dose.med.dosagem} · ${dose.med.via}${dose.obs ? ' · ' + dose.obs : ''}</div>
+    </div>
+    <div class="horario">${dose.hora}</div>
+  `;
+  el.querySelector('.checkbox').addEventListener('click', () => {
+    marcarDose(dose.med.id, dose.data, dose.hora, !feita);
+  });
+  return el;
+}
+
+/* =========================================================
+   RENDER — SEMANA
+   ========================================================= */
+function renderSemana() {
+  const base = new Date();
+  base.setDate(base.getDate() + estado.semanaOffset * 7);
+  const dow = base.getDay();
+  const inicio = new Date(base);
+  inicio.setDate(base.getDate() - dow);
+  const fim = new Date(inicio);
+  fim.setDate(inicio.getDate() + 6);
+
+  document.getElementById('sem-titulo').textContent =
+    `${inicio.getDate()} de ${MESES[inicio.getMonth()]} — ${fim.getDate()} de ${MESES[fim.getMonth()]} de ${fim.getFullYear()}`;
+
+  const grid = document.getElementById('grid-semana');
+  grid.innerHTML = '';
+  const doses = todasDoses(hojeISO());
+  const hojeStr = hojeISO();
+
+  for (let i = 0; i < 7; i++) {
+    const d = new Date(inicio);
+    d.setDate(inicio.getDate() + i);
+    const iso = fmtISO(d);
+    const dia = document.createElement('div');
+    dia.className = 'dia' + (iso === hojeStr ? ' hoje' : '');
+    dia.innerHTML = `
+      <div class="dia-cabecalho">
+        <span class="num">${d.getDate()}</span>
+        <span class="dsem">${DIAS_SEMANA_CURTO[d.getDay()]}</span>
+      </div>
+      <div class="dia-corpo"></div>
+    `;
+    const corpo = dia.querySelector('.dia-corpo');
+    const doses_dia = doses.filter(x => x.data === iso).slice().sort((a,b)=>a.hora.localeCompare(b.hora));
+    if (doses_dia.length === 0) {
+      corpo.innerHTML = '<div style="color:var(--texto-fraco);font-size:0.75rem;">—</div>';
+    } else {
+      for (const dose of doses_dia) {
+        const k = keyDose(dose.med.id, dose.data, dose.hora);
+        const feita = !!estado.feitas[k];
+        const ev = document.createElement('div');
+        ev.className = 'dia-evento ' + dose.med.tipo + (feita ? ' feito' : '');
+        ev.innerHTML = `<span class="n">${dose.med.nome.split(' ')[0]}</span><span class="h">${dose.hora}</span>`;
+        ev.title = `${dose.med.nome} · ${dose.med.dosagem}\nClique para ${feita ? 'desmarcar' : 'marcar como dado'}`;
+        ev.style.cursor = 'pointer';
+        ev.addEventListener('click', () => marcarDose(dose.med.id, dose.data, dose.hora, !feita));
+        corpo.appendChild(ev);
+      }
+    }
+    grid.appendChild(dia);
+  }
+}
+
+/* =========================================================
+   RENDER — MEDICAMENTOS
+   ========================================================= */
+function renderMeds() {
+  const cont = document.getElementById('meds-lista');
+  cont.innerHTML = '';
+  const hoje = hojeISO();
+  const todas = todasDoses(hoje);
+
+  for (const m of MEDS) {
+    const doses = todas.filter(x => x.med.id === m.id);
+    const feitas = doses.filter(x => estado.feitas[keyDose(x.med.id, x.data, x.hora)]).length;
+    const total = doses.length;
+    const pct = total > 0 ? Math.round((feitas/total)*100) : 0;
+    const proxima = doses.find(x => !estado.feitas[keyDose(x.med.id, x.data, x.hora)] && x.data >= hoje);
+
+    const card = document.createElement('div');
+    card.className = 'med-card';
+    card.innerHTML = `
+      <div class="med-cabecalho">
+        <div class="med-nome">
+          <span class="num">${m.numero}</span>
+          ${m.nome}
+          <span class="tag tag-${m.tipo}">${m.tipoLabel}</span>
+        </div>
+      </div>
+      <div class="med-info">
+        <div class="campo"><div class="rot">Dosagem</div><div class="valor">${m.dosagem}</div></div>
+        <div class="campo"><div class="rot">Via</div><div class="valor">${m.via}</div></div>
+        <div class="campo"><div class="rot">Frequência</div><div class="valor">${m.frequencia}</div></div>
+        ${m.valor ? `<div class="campo"><div class="rot">Valor</div><div class="valor">${m.valor}</div></div>` : ''}
+        <div class="campo"><div class="rot">Próxima dose</div><div class="valor">${proxima ? fmtBR(proxima.data) + ' às ' + proxima.hora : '—'}</div></div>
+      </div>
+      <div class="med-instrucao">${m.instrucao}</div>
+      ${total > 0 ? `
+        <div class="med-progresso">
+          <span>${feitas} de ${total} doses previstas</span>
+          <div class="barra"><div class="barra-fill" style="width:${pct}%"></div></div>
+          <span>${pct}%</span>
+        </div>
+      ` : ''}
+    `;
+    cont.appendChild(card);
+  }
+}
+
+/* =========================================================
+   RENDER — BANHOS (guia visual)
+   ========================================================= */
+function renderBanhos() {
+  const cont = document.getElementById('banhos-conteudo');
+  cont.innerHTML = '';
+
+  const proxSab = proximoDiaSemana(6); // sábado
+  const proxQua = proximoDiaSemana(3); // quarta
+
+  const passos = [
+    {
+      passo: 'Passo 1',
+      nome: 'Sebotrat "O" xampu',
+      quando: 'Quartas e sábados por 30 dias',
+      tempo: '10 min ensaboado',
+      inst: 'Aplicar como banho. Deixar ensaboado por 10 minutos e enxaguar bem.'
+    },
+    {
+      passo: 'Passo 2',
+      nome: 'Hidrapet xampu',
+      quando: 'Aos sábados (uso contínuo semanal)',
+      tempo: '10 min ensaboado',
+      inst: 'Imediatamente após o enxágue do Sebotrat, aplicar como banho. Deixar ensaboado por 10 minutos e enxaguar.'
+    },
+    {
+      passo: 'Passo 3',
+      nome: 'Phisioderm Condicionador',
+      quando: 'Aos sábados (uso contínuo semanal)',
+      tempo: '5 min',
+      inst: 'Após o enxágue do Hidrapet, aplicar sobre o pelo molhado espalhando por todo o corpo. Deixar 5 minutos, enxaguar e secar com secador levemente morno.'
+    },
+  ];
+
+  const intro = document.createElement('div');
+  intro.className = 'vet-card';
+  intro.innerHTML = `
+    <div class="rotulo">Roteiro do banho</div>
+    <div class="nome">Ordem correta dos produtos</div>
+    <p style="color:var(--texto-sec); font-size:0.9rem; margin-top:0.5rem;">
+      <strong>Quartas:</strong> só o Sebotrat "O" (passo 1).<br>
+      <strong>Sábados:</strong> os três — Sebotrat, Hidrapet e Phisioderm Condicionador, na ordem.<br>
+      <strong>Próxima quarta:</strong> ${fmtBR(proxQua)} · <strong>Próximo sábado:</strong> ${fmtBR(proxSab)}.
+    </p>
+  `;
+  cont.appendChild(intro);
+
+  for (const p of passos) {
+    const card = document.createElement('div');
+    card.className = 'card';
+    card.innerHTML = `
+      <div style="display:flex; align-items:baseline; gap:0.6rem; margin-bottom:0.4rem;">
+        <span class="tag tag-banho">${p.passo}</span>
+        <span class="serif" style="font-size:1.25rem; color:var(--verde-escuro);">${p.nome}</span>
+      </div>
+      <div style="color:var(--texto-sec); font-size:0.85rem; margin-bottom:0.5rem;">
+        📅 ${p.quando} &nbsp;·&nbsp; ⏱️ ${p.tempo}
+      </div>
+      <div class="med-instrucao">${p.inst}</div>
+    `;
+    cont.appendChild(card);
+  }
+
+  // Cortavance
+  const cort = document.createElement('div');
+  cort.className = 'card';
+  cort.innerHTML = `
+    <div style="display:flex; align-items:baseline; gap:0.6rem; margin-bottom:0.4rem;">
+      <span class="tag tag-topico">Extra — patas</span>
+      <span class="serif" style="font-size:1.25rem; color:var(--verde-escuro);">Cortavance spray</span>
+    </div>
+    <div style="color:var(--texto-sec); font-size:0.85rem; margin-bottom:0.5rem;">
+      📅 Quartas e sábados por 15 dias &nbsp;·&nbsp; ⏱️ Colar elisabetano 10 min após
+    </div>
+    <div class="med-instrucao">
+      Aplicar 2 borrifadas nos interdígitos dos quatro membros. Colocar o colar elisabetano por 10 minutos após cada aplicação.<br>
+      <strong>Datas previstas:</strong> 29/07, 01/08, 05/08, 08/08.
+    </div>
+  `;
+  cont.appendChild(cort);
+}
+
+function proximoDiaSemana(dow) {
+  const hoje = new Date();
+  const diff = (dow - hoje.getDay() + 7) % 7 || 7;
+  const d = new Date(hoje);
+  d.setDate(hoje.getDate() + diff);
+  return fmtISO(d);
+}
+
+/* =========================================================
+   RENDER — ANOTAÇÕES
+   ========================================================= */
+function adicionarNota() {
+  const t = document.getElementById('nota-nova');
+  const txt = t.value.trim();
+  if (!txt) return;
+  estado.notas.unshift({ quando: new Date().toISOString(), texto: txt });
+  t.value = '';
+  salvar();
+  renderNotas();
+  toast('Anotação adicionada');
+}
+function apagarNota(i) {
+  if (!confirm('Apagar esta anotação?')) return;
+  estado.notas.splice(i, 1);
+  salvar();
+  renderNotas();
+}
+function renderNotas() {
+  const cont = document.getElementById('notas-lista');
+  cont.innerHTML = '';
+  if (estado.notas.length === 0) {
+    cont.innerHTML = '<div class="card vazio">Nenhuma anotação ainda.</div>';
+    return;
+  }
+  estado.notas.forEach((n, i) => {
+    const el = document.createElement('div');
+    el.className = 'nota';
+    const d = new Date(n.quando);
+    el.innerHTML = `
+      <button class="apagar" onclick="apagarNota(${i})">apagar</button>
+      <div class="quando">${d.toLocaleString('pt-BR')}</div>
+      <div class="texto"></div>
+    `;
+    el.querySelector('.texto').textContent = n.texto;
+    cont.appendChild(el);
+  });
+}
+
+/* =========================================================
+   RENDER — HISTÓRICO
+   ========================================================= */
+function renderHistorico() {
+  const cont = document.getElementById('historico-lista');
+  cont.innerHTML = '';
+  if (estado.historico.length === 0) {
+    cont.innerHTML = '<div class="vazio">Sem registros ainda.</div>';
+    return;
+  }
+  for (const h of estado.historico) {
+    const d = new Date(h.quando);
+    const el = document.createElement('div');
+    el.className = 'hist-item';
+    el.innerHTML = `
+      <div class="quando">${d.toLocaleString('pt-BR', {day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'})}</div>
+      <div class="o-que"><strong>${h.med}</strong> — ${h.dose}</div>
+      <div class="acao">${h.acao}</div>
+    `;
+    cont.appendChild(el);
+  }
+}
+function limparHistorico() {
+  if (!confirm('Apagar todo o histórico? (Doses marcadas continuam marcadas.)')) return;
+  estado.historico = [];
+  salvar();
+  renderHistorico();
+  toast('Histórico limpo');
+}
+
+/* =========================================================
+   BACKUP
+   ========================================================= */
+function exportarBackup() {
+  const dados = JSON.stringify(estado, null, 2);
+  const blob = new Blob([dados], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `freddy-cuidados-backup-${hojeISO()}.json`;
+  a.click();
+  URL.revokeObjectURL(url);
+  toast('Backup exportado');
+}
+function importarBackup() {
+  document.getElementById('importar-file').click();
+}
+document.getElementById('importar-file').addEventListener('change', (e) => {
+  const f = e.target.files[0];
+  if (!f) return;
+  const reader = new FileReader();
+  reader.onload = (ev) => {
+    try {
+      const s = JSON.parse(ev.target.result);
+      if (!s.feitas) throw new Error('Formato inválido');
+      if (!confirm('Substituir dados atuais pelo backup importado?')) return;
+      estado = s;
+      estado.semanaOffset = 0;
+      salvar();
+      renderTudo();
+      toast('Backup importado');
+    } catch(err) {
+      alert('Erro ao importar: ' + err.message);
+    }
+  };
+  reader.readAsText(f);
+});
+
+/* =========================================================
+   NAVEGAÇÃO
+   ========================================================= */
+document.querySelectorAll('nav button').forEach(b => {
+  b.addEventListener('click', () => {
+    document.querySelectorAll('nav button').forEach(x => x.classList.remove('ativo'));
+    document.querySelectorAll('.aba').forEach(x => x.classList.remove('ativa'));
+    b.classList.add('ativo');
+    document.getElementById('aba-' + b.dataset.aba).classList.add('ativa');
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  });
+});
+document.getElementById('sem-ant').addEventListener('click', () => { estado.semanaOffset--; renderSemana(); });
+document.getElementById('sem-prox').addEventListener('click', () => { estado.semanaOffset++; renderSemana(); });
+document.getElementById('btn-trancar').addEventListener('click', (e) => {
+  e.preventDefault();
+  try { localStorage.removeItem('freddy-unlocked-v1'); } catch(err){}
+  location.reload();
+});
+
+/* =========================================================
+   NOTIFICAÇÕES / PWA
+   ========================================================= */
+let swReg = null;
+
+async function registrarSW() {
+  if (!('serviceWorker' in navigator)) return;
+  try {
+    swReg = await navigator.serviceWorker.register('freddy-sw.js');
+    // se já ativo antes do register terminar
+    if (!swReg.active && navigator.serviceWorker.controller) {
+      swReg = await navigator.serviceWorker.ready;
+    } else {
+      swReg = await navigator.serviceWorker.ready;
+    }
+  } catch(e) {
+    console.warn('SW não registrado:', e);
+  }
+}
+
+function suportaTriggers() {
+  return 'showTrigger' in Notification.prototype || (window.TimestampTrigger !== undefined);
+}
+
+function atualizarStatusNotif() {
+  const el = document.getElementById('notif-status');
+  const btn = document.getElementById('btn-permitir');
+  if (!('Notification' in window)) {
+    el.textContent = 'Este navegador não suporta notificações.';
+    btn.disabled = true; btn.textContent = 'Indisponível';
+    return;
+  }
+  const perm = Notification.permission;
+  if (perm === 'granted') {
+    el.innerHTML = '✅ Permissão concedida. ' + (suportaTriggers()
+      ? '<span style="color:var(--verde);">Agendamento em background disponível.</span>'
+      : '<span style="color:var(--pendente);">Este navegador não suporta agendamento em background — lembretes só chegam com o app aberto.</span>');
+    btn.textContent = 'Ativa'; btn.disabled = true; btn.style.background = 'var(--feito)';
+  } else if (perm === 'denied') {
+    el.innerHTML = '❌ Permissão bloqueada. Habilite nas configurações do navegador (cadeado na barra de endereço).';
+    btn.textContent = 'Bloqueada'; btn.disabled = true;
+  } else {
+    el.textContent = 'Notificações não estão ativas.';
+    btn.textContent = 'Ativar notificações'; btn.disabled = false;
+  }
+}
+
+async function pedirPermissao() {
+  if (!('Notification' in window)) return;
+  const perm = await Notification.requestPermission();
+  atualizarStatusNotif();
+  if (perm === 'granted') {
+    estado.notif.ativo = true;
+    document.getElementById('cfg-ativo').checked = true;
+    salvar();
+    reagendarTodas();
+    toast('🔔 Notificações ativadas');
+  }
+}
+
+function proximasDoses(horizonteHoras = 72) {
+  const agora = new Date();
+  const limite = new Date(agora.getTime() + horizonteHoras * 3600_000);
+  const hoje = hojeISO();
+  const doses = todasDoses(hoje);
+  return doses
+    .map(d => ({ ...d, quando: new Date(d.data + 'T' + d.hora + ':00') }))
+    .filter(d => d.quando > agora && d.quando <= limite)
+    .filter(d => !estado.feitas[keyDose(d.med.id, d.data, d.hora)])
+    .sort((a,b) => a.quando - b.quando);
+}
+
+async function reagendarTodas() {
+  if (!('Notification' in window) || Notification.permission !== 'granted') {
+    toast('Ative as notificações primeiro');
+    return;
+  }
+  if (!estado.notif.ativo) {
+    toast('Marque “Enviar lembretes” primeiro');
+    return;
+  }
+  await registrarSW();
+
+  // Limpar agendadas antigas
+  if (swReg) {
+    try {
+      const ativas = await swReg.getNotifications({ includeTriggered: false });
+      for (const n of ativas) n.close();
+    } catch(e) { /* ignore */ }
+  }
+  // Limpa timeouts em memória
+  for (const t of _timeoutsAgendados) clearTimeout(t);
+  _timeoutsAgendados = [];
+
+  const antecMs = (estado.notif.antecMin || 0) * 60_000;
+  const proximas = proximasDoses(72);
+  let agendadas = 0;
+
+  for (const d of proximas) {
+    const disparo = new Date(d.quando.getTime() - antecMs);
+    if (disparo <= new Date()) continue;
+    if (agendadas >= 40) break; // limite de segurança
+
+    const titulo = `Freddy · ${d.med.nome}`;
+    const corpo = `${d.med.dosagem} · ${d.med.via} · ${d.hora}${
+      estado.notif.antecMin > 0 ? ` (em ${estado.notif.antecMin} min)` : ''}`;
+    const opcoes = {
+      body: corpo,
+      icon: 'assets/icon-freddy.svg',
+      badge: 'assets/icon-freddy.svg',
+      tag: keyDose(d.med.id, d.data, d.hora),
+      requireInteraction: false,
+      data: { dose: keyDose(d.med.id, d.data, d.hora) }
+    };
+
+    let usouTrigger = false;
+    if (suportaTriggers() && swReg) {
+      try {
+        opcoes.showTrigger = new TimestampTrigger(disparo.getTime());
+        await swReg.showNotification(titulo, opcoes);
+        usouTrigger = true;
+        agendadas++;
+      } catch(e) {
+        console.warn('Trigger falhou, usando setTimeout:', e);
+      }
+    }
+
+    if (!usouTrigger) {
+      // Fallback: só funciona enquanto a página está aberta
+      const delay = disparo - new Date();
+      if (delay > 0 && delay < 24 * 3600_000) { // só até 24h no timeout
+        const tid = setTimeout(() => {
+          if (swReg) swReg.showNotification(titulo, opcoes);
+          else new Notification(titulo, opcoes);
+        }, delay);
+        _timeoutsAgendados.push(tid);
+        agendadas++;
+      }
+
+      // repetir se não marcado
+      if (estado.notif.repetir) {
+        const delay2 = delay + 30 * 60_000;
+        if (delay2 > 0 && delay2 < 24 * 3600_000) {
+          const tid2 = setTimeout(() => {
+            const kk = opcoes.tag;
+            if (!estado.feitas[kk]) {
+              const t2 = { ...opcoes, body: '⏰ Lembrete: ' + corpo };
+              if (swReg) swReg.showNotification(titulo, t2); else new Notification(titulo, t2);
+            }
+          }, delay2);
+          _timeoutsAgendados.push(tid2);
+        }
+      }
+    } else if (estado.notif.repetir) {
+      // repetir 30min depois via trigger também
+      try {
+        const rep = { ...opcoes,
+          body: '⏰ Lembrete: ' + corpo,
+          tag: opcoes.tag + '|rep',
+          showTrigger: new TimestampTrigger(disparo.getTime() + 30 * 60_000)
+        };
+        await swReg.showNotification(titulo, rep);
+      } catch(e){}
+    }
+  }
+
+  toast(agendadas === 0 ? 'Nenhuma dose futura para agendar' : `📅 ${agendadas} lembretes agendados`);
+  atualizarListaAgendadas();
+}
+
+let _timeoutsAgendados = [];
+
+async function atualizarListaAgendadas() {
+  const el = document.getElementById('lista-agendadas');
+  if (!el) return;
+  const proximas = proximasDoses(72).slice(0, 10);
+  if (proximas.length === 0) {
+    el.innerHTML = '<em>Nenhuma dose futura nas próximas 72h.</em>';
+    return;
+  }
+  el.innerHTML = proximas.map(d => {
+    const antecMs = (estado.notif.antecMin || 0) * 60_000;
+    const disparo = new Date(d.quando.getTime() - antecMs);
+    return `<div style="padding:0.4rem 0; border-bottom:1px solid var(--border-suave);">
+      <strong style="color:var(--verde-escuro);">${d.med.nome}</strong> · ${d.med.dosagem}<br>
+      <span style="color:var(--texto-fraco);">Dose ${fmtBR(d.data)} ${d.hora} → notificar ${disparo.toLocaleString('pt-BR', {day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'})}</span>
+    </div>`;
+  }).join('');
+}
+
+async function testarNotif() {
+  if (!('Notification' in window)) { toast('Navegador sem suporte'); return; }
+  if (Notification.permission !== 'granted') { await pedirPermissao(); if (Notification.permission !== 'granted') return; }
+  await registrarSW();
+  const opts = {
+    body: 'Se você está vendo isto, as notificações estão funcionando! 🐶',
+    icon: 'assets/icon-freddy.svg',
+    badge: 'assets/icon-freddy.svg'
+  };
+  if (swReg) await swReg.showNotification('Freddy · teste', opts);
+  else new Notification('Freddy · teste', opts);
+}
+
+async function limparAgendadas() {
+  if (swReg) {
+    const ativas = await swReg.getNotifications({ includeTriggered: false });
+    for (const n of ativas) n.close();
+  }
+  for (const t of _timeoutsAgendados) clearTimeout(t);
+  _timeoutsAgendados = [];
+  toast('Agendamentos cancelados');
+  atualizarListaAgendadas();
+}
+
+// Bindings de configuração
+document.getElementById('btn-permitir').addEventListener('click', pedirPermissao);
+document.getElementById('cfg-ativo').addEventListener('change', (e) => {
+  estado.notif.ativo = e.target.checked; salvar();
+  if (e.target.checked && Notification.permission === 'granted') reagendarTodas();
+  else if (!e.target.checked) limparAgendadas();
+});
+document.getElementById('cfg-antec').addEventListener('change', (e) => {
+  estado.notif.antecMin = parseInt(e.target.value, 10); salvar();
+  if (estado.notif.ativo && Notification.permission === 'granted') reagendarTodas();
+});
+document.getElementById('cfg-repetir').addEventListener('change', (e) => {
+  estado.notif.repetir = e.target.checked; salvar();
+  if (estado.notif.ativo && Notification.permission === 'granted') reagendarTodas();
+});
+
+function aplicarConfigNotif() {
+  document.getElementById('cfg-ativo').checked = !!estado.notif.ativo;
+  document.getElementById('cfg-antec').value = String(estado.notif.antecMin || 10);
+  document.getElementById('cfg-repetir').checked = !!estado.notif.repetir;
+  atualizarStatusNotif();
+  atualizarListaAgendadas();
+}
+
+/* =========================================================
+   INICIAR
+   ========================================================= */
+function renderTudo() {
+  renderHoje();
+  renderSemana();
+  renderMeds();
+  renderBanhos();
+  renderNotas();
+  renderHistorico();
+  atualizarListaAgendadas();
+}
+renderTudo();
+aplicarConfigNotif();
+registrarSW().then(() => {
+  // Reagenda ao abrir (para PWAs abertas depois de dias)
+  if (estado.notif.ativo && 'Notification' in window && Notification.permission === 'granted') {
+    setTimeout(reagendarTodas, 1500);
+  }
+});
+
+// Atualiza a cada minuto o "atrasada" / próxima dose
+setInterval(() => {
+  const abaAtiva = document.querySelector('.aba.ativa').id;
+  if (abaAtiva === 'aba-hoje') renderHoje();
+}, 60000);
+</script>
+</body>
+</html>
