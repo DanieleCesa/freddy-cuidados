@@ -1,5 +1,5 @@
 // Service Worker — Cuidados do Freddy
-const CACHE = 'freddy-v7';
+const CACHE = 'freddy-v8';
 const ARQUIVOS = [
   './',
   './index.html',
@@ -18,15 +18,34 @@ self.addEventListener('activate', (e) => {
   );
 });
 
+// Estratégia: network-first pra HTML/JSON (sempre pega fresh),
+// cache-first pra assets estáticos (icones, fontes).
 self.addEventListener('fetch', (e) => {
   if (e.request.method !== 'GET') return;
-  e.respondWith(
-    caches.match(e.request).then(resp => resp || fetch(e.request).then(fresh => {
-      const clone = fresh.clone();
-      caches.open(CACHE).then(c => c.put(e.request, clone)).catch(()=>{});
-      return fresh;
-    }).catch(() => resp))
-  );
+  const url = new URL(e.request.url);
+  const isHTML = e.request.mode === 'navigate'
+    || url.pathname.endsWith('.html')
+    || url.pathname.endsWith('/')
+    || url.pathname.endsWith('.webmanifest')
+    || url.pathname.endsWith('.js');
+
+  if (isHTML) {
+    e.respondWith(
+      fetch(e.request).then(fresh => {
+        const clone = fresh.clone();
+        caches.open(CACHE).then(c => c.put(e.request, clone)).catch(()=>{});
+        return fresh;
+      }).catch(() => caches.match(e.request))
+    );
+  } else {
+    e.respondWith(
+      caches.match(e.request).then(resp => resp || fetch(e.request).then(fresh => {
+        const clone = fresh.clone();
+        caches.open(CACHE).then(c => c.put(e.request, clone)).catch(()=>{});
+        return fresh;
+      }).catch(() => resp))
+    );
+  }
 });
 
 // Ao clicar na notificação, abre o app

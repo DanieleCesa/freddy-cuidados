@@ -2100,7 +2100,21 @@ let swReg = null;
 async function registrarSW() {
   if (!('serviceWorker' in navigator)) return;
   try {
-    swReg = await navigator.serviceWorker.register('freddy-sw.js');
+    swReg = await navigator.serviceWorker.register('freddy-sw.js', { updateViaCache: 'none' });
+    // Verifica atualizações a cada abertura
+    swReg.update().catch(()=>{});
+    // Se um novo SW for encontrado, ativa imediatamente
+    swReg.addEventListener('updatefound', () => {
+      const novo = swReg.installing;
+      if (novo) novo.addEventListener('statechange', () => {
+        if (novo.state === 'activated') {
+          // Recarrega automaticamente na nova versão
+          if (!navigator.serviceWorker.controller) return;
+          console.log('Nova versão instalada — recarregando');
+          location.reload();
+        }
+      });
+    });
     // se já ativo antes do register terminar
     if (!swReg.active && navigator.serviceWorker.controller) {
       swReg = await navigator.serviceWorker.ready;
