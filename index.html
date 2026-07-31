@@ -1321,6 +1321,7 @@ const MEDS = [
    ========================================================= */
 const STORAGE_KEY = 'freddy-cuidados-v1';
 let estado = carregar();
+migrarFeitas();
 
 function carregar() {
   const padrao = {
@@ -1345,6 +1346,22 @@ function carregar() {
 function salvarLocal() {
   try { localStorage.setItem(STORAGE_KEY, JSON.stringify(estado)); }
   catch(e) { toast('Erro ao salvar 😢'); }
+}
+
+// Helper: dose está feita? (Trata formato novo {v,t} e legado string)
+function isFeita(k) {
+  const x = estado.feitas[k];
+  if (!x) return false;
+  if (typeof x === 'string') return true;   // legado: valor era timestamp ISO
+  return x.v === true;
+}
+
+// Migração: converte valores string do formato antigo para {v:true, t:ISO}
+function migrarFeitas() {
+  for (const k in estado.feitas) {
+    const v = estado.feitas[k];
+    if (typeof v === 'string') estado.feitas[k] = { v: true, t: v };
+  }
 }
 function salvar() {
   salvarLocal();
@@ -1376,10 +1393,20 @@ function setSyncStatus(estadoTxt, cor) {
 
 function mergeEstado(remoto) {
   if (!remoto || typeof remoto !== 'object') return;
-  // feitas: união, timestamp maior vence
-  const feitas = { ...(remoto.feitas || {}) };
-  for (const k in (estado.feitas || {})) {
-    if (!feitas[k] || estado.feitas[k] > feitas[k]) feitas[k] = estado.feitas[k];
+  // Normaliza pra formato {v,t}
+  const norm = (x) => {
+    if (!x) return null;
+    if (typeof x === 'string') return { v: true, t: x };
+    return { v: !!x.v, t: x.t || '' };
+  };
+  // feitas: união pelas chaves; para cada chave, timestamp maior vence (mesmo se v=false)
+  const feitas = {};
+  const keys = new Set([...Object.keys(remoto.feitas || {}), ...Object.keys(estado.feitas || {})]);
+  for (const k of keys) {
+    const l = norm(estado.feitas[k]);
+    const r = norm((remoto.feitas || {})[k]);
+    if (l && r) feitas[k] = (l.t >= r.t) ? l : r;
+    else feitas[k] = l || r;
   }
   // notas: dedupe por quando
   const notasMap = {};
@@ -1517,23 +1544,15 @@ function todasDoses(hoje) {
 function marcarDose(medId, data, hora, feita) {
   const k = keyDose(medId, data, hora);
   const med = MEDS.find(m => m.id === medId);
-  if (feita) {
-    estado.feitas[k] = new Date().toISOString();
-    estado.historico.unshift({
-      quando: new Date().toISOString(),
-      med: med.nome,
-      dose: `${med.dosagem} · ${data} ${hora}`,
-      acao: 'marcado como dado'
-    });
-  } else {
-    delete estado.feitas[k];
-    estado.historico.unshift({
-      quando: new Date().toISOString(),
-      med: med.nome,
-      dose: `${med.dosagem} · ${data} ${hora}`,
-      acao: 'desmarcado'
-    });
-  }
+  const agora = new Date().toISOString();
+  // Grava marca/desmarca com timestamp — permite propagar deleções na sync
+  estado.feitas[k] = { v: !!feita, t: agora };
+  estado.historico.unshift({
+    quando: agora,
+    med: med.nome,
+    dose: `${med.dosagem} · ${data} ${hora}`,
+    acao: feita ? 'marcado como dado' : 'desmarcado'
+  });
   estado.historico = estado.historico.slice(0, 200);
   salvar();
   renderTudo();
@@ -1568,8 +1587,8 @@ function renderHoje() {
 
   document.getElementById('hoje-sub').textContent = `${DIAS_SEMANA[d.getDay()]}, ${d.getDate()} de ${MESES[d.getMonth()]} de ${d.getFullYear()}`;
 
-  const feitas = doses.filter(x => estado.feitas[keyDose(x.med.id, x.data, x.hora)]);
-  const pendentes = doses.filter(x => !estado.feitas[keyDose(x.med.id, x.data, x.hora)]);
+  const feitas = doses.filter(x => isFeita(keyDose(x.med.id, x.data, x.hora)));
+  const pendentes = doses.filter(x => !isFeita(keyDose(x.med.id, x.data, x.hora)));
 
   document.getElementById('stat-doses').innerHTML = `${pendentes.length} <small>a dar</small>`;
   document.getElementById('stat-feitas').innerHTML = `${feitas.length} <small>de ${doses.length}</small>`;
@@ -1585,7 +1604,7 @@ function renderHoje() {
     : '<small>sem doses</small>';
 
   // próximo banho
-  const proxBanho = todasDoses(hoje).find(x => x.med.tipo === 'banho' && x.data >= hoje && !estado.feitas[keyDose(x.med.id, x.data, x.hora)]);
+  const proxBanho = todasDoses(hoje).find(x => x.med.tipo === 'banho' && x.data >= hoje && !isFeita(keyDose(x.med.id, x.data, x.hora)));
   document.getElementById('stat-banho').innerHTML = proxBanho
     ? `${fmtBR(proxBanho.data).slice(0,5)} <small>· ${DIAS_SEMANA_CURTO[new Date(proxBanho.data + 'T12:00:00').getDay()]}</small>`
     : '<small>—</small>';
@@ -1610,7 +1629,7 @@ function renderHoje() {
   for (const g of grupos) {
     const lista = doses.filter(g.filtro);
     if (lista.length === 0) continue;
-    const feitasG = lista.filter(x => estado.feitas[keyDose(x.med.id, x.data, x.hora)]).length;
+    const feitasG = lista.filter(x => isFeita(keyDose(x.med.id, x.data, x.hora))).length;
     const h = document.createElement('div');
     h.className = 'grupo-titulo';
     h.innerHTML = `${g.titulo} <span class="contador">${feitasG}/${lista.length}</span>`;
@@ -1623,7 +1642,7 @@ function renderHoje() {
 
 function renderDose(dose) {
   const k = keyDose(dose.med.id, dose.data, dose.hora);
-  const feita = !!estado.feitas[k];
+  const feita = isFeita(k);
   const agora = new Date();
   const dt = new Date(dose.data + 'T' + dose.hora + ':00');
   const atrasada = !feita && dt < agora && dose.data === hojeISO();
@@ -1691,7 +1710,7 @@ function renderSemana() {
     } else {
       for (const dose of doses_dia) {
         const k = keyDose(dose.med.id, dose.data, dose.hora);
-        const feita = !!estado.feitas[k];
+        const feita = isFeita(k);
         const ev = document.createElement('div');
         ev.className = 'dia-evento ' + dose.med.tipo + (feita ? ' feito' : '');
         ev.innerHTML = `<span class="n">${dose.med.nome.split(' ')[0]}</span><span class="h">${dose.hora}</span>`;
@@ -1716,10 +1735,10 @@ function renderMeds() {
 
   for (const m of MEDS) {
     const doses = todas.filter(x => x.med.id === m.id);
-    const feitas = doses.filter(x => estado.feitas[keyDose(x.med.id, x.data, x.hora)]).length;
+    const feitas = doses.filter(x => isFeita(keyDose(x.med.id, x.data, x.hora))).length;
     const total = doses.length;
     const pct = total > 0 ? Math.round((feitas/total)*100) : 0;
-    const proxima = doses.find(x => !estado.feitas[keyDose(x.med.id, x.data, x.hora)] && x.data >= hoje);
+    const proxima = doses.find(x => !isFeita(keyDose(x.med.id, x.data, x.hora)) && x.data >= hoje);
 
     const foto = estado.fotos[m.id];
 
@@ -2174,7 +2193,7 @@ function proximasDoses(horizonteHoras = 72) {
   return doses
     .map(d => ({ ...d, quando: new Date(d.data + 'T' + d.hora + ':00') }))
     .filter(d => d.quando > agora && d.quando <= limite)
-    .filter(d => !estado.feitas[keyDose(d.med.id, d.data, d.hora)])
+    .filter(d => !isFeita(keyDose(d.med.id, d.data, d.hora)))
     .sort((a,b) => a.quando - b.quando);
 }
 
@@ -2251,7 +2270,7 @@ async function reagendarTodas() {
         if (delay2 > 0 && delay2 < 24 * 3600_000) {
           const tid2 = setTimeout(() => {
             const kk = opcoes.tag;
-            if (!estado.feitas[kk]) {
+            if (!isFeita(kk)) {
               const t2 = { ...opcoes, body: '⏰ Lembrete: ' + corpo };
               if (swReg) swReg.showNotification(titulo, t2); else new Notification(titulo, t2);
             }
