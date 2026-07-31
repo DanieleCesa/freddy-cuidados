@@ -583,6 +583,119 @@
     .card, .med-card, .dia { break-inside: avoid; }
   }
 
+  /* Foto do remédio */
+  .med-foto-area {
+    display: flex;
+    gap: 0.75rem;
+    align-items: flex-start;
+    margin-bottom: 0.75rem;
+  }
+  .med-foto-thumb {
+    width: 88px;
+    height: 88px;
+    border-radius: 10px;
+    background: var(--bege);
+    border: 1px solid var(--border-suave);
+    overflow: hidden;
+    flex-shrink: 0;
+    cursor: pointer;
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: transform 0.15s;
+  }
+  .med-foto-thumb:hover { transform: scale(1.03); }
+  .med-foto-thumb img { width: 100%; height: 100%; object-fit: cover; }
+  .med-foto-placeholder {
+    width: 88px;
+    height: 88px;
+    border: 2px dashed var(--border);
+    border-radius: 10px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    background: var(--bege);
+    color: var(--texto-fraco);
+    font-size: 0.7rem;
+    text-align: center;
+    transition: all 0.15s;
+    flex-shrink: 0;
+  }
+  .med-foto-placeholder:hover {
+    border-color: var(--verde-claro);
+    color: var(--verde);
+    background: var(--verde-suave);
+  }
+  .med-foto-placeholder .icone { font-size: 1.5rem; margin-bottom: 2px; }
+  .med-foto-acoes {
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+    justify-content: center;
+  }
+  .med-foto-acoes button {
+    background: transparent;
+    border: 1px solid var(--border);
+    color: var(--texto-sec);
+    padding: 4px 10px;
+    border-radius: 6px;
+    font-size: 0.75rem;
+    cursor: pointer;
+    font-family: inherit;
+    transition: all 0.15s;
+    white-space: nowrap;
+  }
+  .med-foto-acoes button:hover { border-color: var(--verde); color: var(--verde); }
+  .med-foto-acoes button.apagar:hover { border-color: var(--pendente); color: var(--pendente); }
+
+  /* Lightbox */
+  #lightbox {
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.92);
+    display: none;
+    align-items: center;
+    justify-content: center;
+    z-index: 9998;
+    padding: 1rem;
+    cursor: zoom-out;
+  }
+  #lightbox.aberto { display: flex; }
+  #lightbox img {
+    max-width: 100%;
+    max-height: 100%;
+    border-radius: 8px;
+    box-shadow: 0 4px 40px rgba(0,0,0,0.5);
+  }
+  #lightbox .fechar {
+    position: absolute;
+    top: 1rem;
+    right: 1rem;
+    background: rgba(255,255,255,0.15);
+    border: none;
+    color: white;
+    width: 44px;
+    height: 44px;
+    border-radius: 50%;
+    font-size: 1.5rem;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  #lightbox .legenda {
+    position: absolute;
+    bottom: 1.5rem;
+    left: 0; right: 0;
+    text-align: center;
+    color: white;
+    font-family: 'Cormorant Garamond', serif;
+    font-size: 1.2rem;
+  }
+
   /* Tela de cadeado */
   #lock {
     position: fixed;
@@ -931,6 +1044,14 @@
 
 <div class="toast" id="toast">—</div>
 
+<div id="lightbox" onclick="fecharLightbox(event)">
+  <button class="fechar" onclick="fecharLightbox(event)">✕</button>
+  <img id="lightbox-img" src="" alt="">
+  <div class="legenda" id="lightbox-legenda"></div>
+</div>
+
+<input type="file" id="foto-input" accept="image/*" capture="environment" style="display:none">
+
 <script>
 /* =========================================================
    DADOS DA RECEITA — FREDDY 28/07/2026
@@ -1199,7 +1320,7 @@ let estado = carregar();
 
 function carregar() {
   const padrao = {
-    feitas: {}, notas: [], historico: [], semanaOffset: 0,
+    feitas: {}, notas: [], historico: [], semanaOffset: 0, fotos: {},
     notif: { ativo: false, antecMin: 10, repetir: false }
   };
   try {
@@ -1209,6 +1330,7 @@ function carregar() {
     s.feitas = s.feitas || {};
     s.notas = s.notas || [];
     s.historico = s.historico || [];
+    s.fotos = s.fotos || {};
     s.semanaOffset = 0;
     s.notif = { ...padrao.notif, ...(s.notif || {}) };
     return s;
@@ -1375,10 +1497,12 @@ function renderDose(dose) {
   const dt = new Date(dose.data + 'T' + dose.hora + ':00');
   const atrasada = !feita && dt < agora && dose.data === hojeISO();
 
+  const foto = estado.fotos[dose.med.id];
   const el = document.createElement('div');
   el.className = 'dose' + (feita ? ' feita' : '') + (atrasada ? ' atrasada' : '');
   el.innerHTML = `
     <div class="checkbox">${feita ? '✓' : ''}</div>
+    ${foto ? `<div class="dose-foto" style="width:42px;height:42px;border-radius:6px;overflow:hidden;flex-shrink:0;cursor:pointer;border:1px solid var(--border-suave);" data-foto="${dose.med.id}"><img src="${foto}" style="width:100%;height:100%;object-fit:cover;" alt=""></div>` : ''}
     <div class="info">
       <div class="nome-med">
         ${dose.med.nome}
@@ -1391,6 +1515,8 @@ function renderDose(dose) {
   el.querySelector('.checkbox').addEventListener('click', () => {
     marcarDose(dose.med.id, dose.data, dose.hora, !feita);
   });
+  const doseFoto = el.querySelector('[data-foto]');
+  if (doseFoto) doseFoto.addEventListener('click', (e) => { e.stopPropagation(); abrirLightbox(dose.med.id); });
   return el;
 }
 
@@ -1464,6 +1590,8 @@ function renderMeds() {
     const pct = total > 0 ? Math.round((feitas/total)*100) : 0;
     const proxima = doses.find(x => !estado.feitas[keyDose(x.med.id, x.data, x.hora)] && x.data >= hoje);
 
+    const foto = estado.fotos[m.id];
+
     const card = document.createElement('div');
     card.className = 'med-card';
     card.innerHTML = `
@@ -1474,6 +1602,24 @@ function renderMeds() {
           <span class="tag tag-${m.tipo}">${m.tipoLabel}</span>
         </div>
       </div>
+
+      <div class="med-foto-area">
+        ${foto ? `
+          <div class="med-foto-thumb" data-abrir="${m.id}">
+            <img src="${foto}" alt="${m.nome}">
+          </div>
+          <div class="med-foto-acoes">
+            <button data-trocar="${m.id}">📷 Trocar</button>
+            <button class="apagar" data-remover="${m.id}">✕ Remover</button>
+          </div>
+        ` : `
+          <div class="med-foto-placeholder" data-adicionar="${m.id}">
+            <div class="icone">📷</div>
+            <div>Adicionar<br>foto</div>
+          </div>
+        `}
+      </div>
+
       <div class="med-info">
         <div class="campo"><div class="rot">Dosagem</div><div class="valor">${m.dosagem}</div></div>
         <div class="campo"><div class="rot">Via</div><div class="valor">${m.via}</div></div>
@@ -1490,9 +1636,105 @@ function renderMeds() {
         </div>
       ` : ''}
     `;
+
+    // Bindings de foto
+    const thumb = card.querySelector('[data-abrir]');
+    if (thumb) thumb.addEventListener('click', () => abrirLightbox(m.id));
+    const btnAdd = card.querySelector('[data-adicionar]');
+    if (btnAdd) btnAdd.addEventListener('click', () => escolherFoto(m.id));
+    const btnTr = card.querySelector('[data-trocar]');
+    if (btnTr) btnTr.addEventListener('click', () => escolherFoto(m.id));
+    const btnRm = card.querySelector('[data-remover]');
+    if (btnRm) btnRm.addEventListener('click', () => removerFoto(m.id));
+
     cont.appendChild(card);
   }
 }
+
+/* =========================================================
+   FOTOS DOS REMÉDIOS
+   ========================================================= */
+let _fotoMedAtivo = null;
+
+function escolherFoto(medId) {
+  _fotoMedAtivo = medId;
+  const inp = document.getElementById('foto-input');
+  inp.value = '';
+  inp.click();
+}
+
+async function comprimirImagem(file, maxLado = 900, quality = 0.82) {
+  const dataUrl = await new Promise((res, rej) => {
+    const r = new FileReader();
+    r.onload = () => res(r.result);
+    r.onerror = rej;
+    r.readAsDataURL(file);
+  });
+  const img = await new Promise((res, rej) => {
+    const i = new Image();
+    i.onload = () => res(i);
+    i.onerror = rej;
+    i.src = dataUrl;
+  });
+  let w = img.width, h = img.height;
+  if (w > h) {
+    if (w > maxLado) { h = Math.round(h * maxLado / w); w = maxLado; }
+  } else {
+    if (h > maxLado) { w = Math.round(w * maxLado / h); h = maxLado; }
+  }
+  const canvas = document.createElement('canvas');
+  canvas.width = w; canvas.height = h;
+  canvas.getContext('2d').drawImage(img, 0, 0, w, h);
+  return canvas.toDataURL('image/jpeg', quality);
+}
+
+document.getElementById('foto-input').addEventListener('change', async (e) => {
+  const file = e.target.files && e.target.files[0];
+  if (!file || !_fotoMedAtivo) return;
+  try {
+    toast('Processando foto…');
+    const comprimida = await comprimirImagem(file);
+    estado.fotos[_fotoMedAtivo] = comprimida;
+    try {
+      salvar();
+    } catch(err) {
+      // Tenta com qualidade menor se estourar quota
+      const menor = await comprimirImagem(file, 700, 0.7);
+      estado.fotos[_fotoMedAtivo] = menor;
+      salvar();
+    }
+    _fotoMedAtivo = null;
+    renderMeds();
+    toast('✓ Foto salva');
+  } catch(err) {
+    alert('Erro ao processar foto: ' + err.message);
+  }
+});
+
+function removerFoto(medId) {
+  if (!confirm('Remover a foto deste remédio?')) return;
+  delete estado.fotos[medId];
+  salvar();
+  renderMeds();
+  toast('Foto removida');
+}
+
+function abrirLightbox(medId) {
+  const foto = estado.fotos[medId];
+  if (!foto) return;
+  const med = MEDS.find(x => x.id === medId);
+  document.getElementById('lightbox-img').src = foto;
+  document.getElementById('lightbox-legenda').textContent = med ? med.nome : '';
+  document.getElementById('lightbox').classList.add('aberto');
+}
+function fecharLightbox(e) {
+  if (e && e.target && e.target.tagName === 'IMG') return;
+  document.getElementById('lightbox').classList.remove('aberto');
+  document.getElementById('lightbox-img').src = '';
+}
+window.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape') fecharLightbox();
+});
 
 /* =========================================================
    RENDER — BANHOS (guia visual)
