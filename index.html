@@ -849,7 +849,7 @@
     <div class="hoje-data" id="hoje-data">—</div>
     <div id="hoje-resumo">—</div>
     <div style="display:flex; gap:0.75rem; align-items:center; justify-content:flex-end; margin-top:0.25rem;">
-      <span id="sync-status" title="Status da sincronização" style="font-size:0.75rem; color:var(--texto-fraco);">☁️ …</span>
+      <a href="#" id="btn-sync" title="Sincronizar agora" style="font-size:0.75rem; text-decoration:none;"><span id="sync-status">☁️ …</span></a>
       <a href="#" id="btn-trancar" style="font-size:0.75rem; color:var(--texto-fraco); text-decoration:none;">🔒 trancar</a>
     </div>
   </div>
@@ -2084,6 +2084,13 @@ document.getElementById('btn-trancar').addEventListener('click', (e) => {
   try { localStorage.removeItem('freddy-unlocked-v1'); } catch(err){}
   location.reload();
 });
+document.getElementById('btn-sync').addEventListener('click', async (e) => {
+  e.preventDefault();
+  if (!sb) { toast('Sincronização indisponível'); return; }
+  await pullMerge();
+  await pushRemote();
+  toast('☁️ Sincronizado');
+});
 
 /* =========================================================
    NOTIFICAÇÕES / PWA
@@ -2346,7 +2353,12 @@ registrarSW().then(() => {
 // Sincronização
 if (sb) {
   setSyncStatus('☁️ conectando…', 'var(--texto-sec)');
-  pullMerge().then(() => iniciarSubscribe());
+  // 1) puxa remoto -> merge com local
+  // 2) empurra o resultado (garante que dados locais preexistentes subam)
+  // 3) escuta mudanças em tempo real
+  pullMerge()
+    .then(() => pushRemote())
+    .then(() => iniciarSubscribe());
 } else {
   setSyncStatus('📴 sem sync', 'var(--texto-fraco)');
 }
