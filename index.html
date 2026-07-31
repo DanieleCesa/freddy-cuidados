@@ -14,6 +14,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;500;600;700&family=Jost:wght@300;400;500;600&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <style>
   * { box-sizing: border-box; margin: 0; padding: 0; }
   :root {
@@ -847,7 +848,10 @@
   <div class="header-info">
     <div class="hoje-data" id="hoje-data">—</div>
     <div id="hoje-resumo">—</div>
-    <a href="#" id="btn-trancar" style="font-size:0.75rem; color:var(--texto-fraco); text-decoration:none; margin-top:0.25rem; display:inline-block;">🔒 trancar</a>
+    <div style="display:flex; gap:0.75rem; align-items:center; justify-content:flex-end; margin-top:0.25rem;">
+      <span id="sync-status" title="Status da sincronização" style="font-size:0.75rem; color:var(--texto-fraco);">☁️ …</span>
+      <a href="#" id="btn-trancar" style="font-size:0.75rem; color:var(--texto-fraco); text-decoration:none;">🔒 trancar</a>
+    </div>
   </div>
 </header>
 
@@ -1338,10 +1342,137 @@ function carregar() {
     return padrao;
   }
 }
-function salvar() {
+function salvarLocal() {
   try { localStorage.setItem(STORAGE_KEY, JSON.stringify(estado)); }
   catch(e) { toast('Erro ao salvar 😢'); }
 }
+function salvar() {
+  salvarLocal();
+  agendarPush();
+}
+
+/* =========================================================
+   SINCRONIZAÇÃO — Supabase
+   ========================================================= */
+const SUPABASE_URL = 'https://bkyodpgybvvennfadhhc.supabase.co';
+const SUPABASE_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJreW9kcGd5YnZ2ZW5uZmFkaGhjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODEzNzA2MzQsImV4cCI6MjA5Njk0NjYzNH0.N_jT5oUQomUvk64rAO-It0wAuD6RnM1cbGsxZ5Aw1VQ';
+
+let sb = null;
+try {
+  if (window.supabase) sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON);
+} catch(e) { console.warn('Supabase não disponível:', e); }
+
+let _pushDebounce = null;
+let _syncando = false;
+let _ultimaSync = null;
+
+function setSyncStatus(estadoTxt, cor) {
+  const el = document.getElementById('sync-status');
+  if (!el) return;
+  el.textContent = estadoTxt;
+  el.style.color = cor || 'var(--texto-fraco)';
+  if (_ultimaSync) el.title = 'Última sincronização: ' + _ultimaSync.toLocaleTimeString('pt-BR');
+}
+
+function mergeEstado(remoto) {
+  if (!remoto || typeof remoto !== 'object') return;
+  // feitas: união, timestamp maior vence
+  const feitas = { ...(remoto.feitas || {}) };
+  for (const k in (estado.feitas || {})) {
+    if (!feitas[k] || estado.feitas[k] > feitas[k]) feitas[k] = estado.feitas[k];
+  }
+  // notas: dedupe por quando
+  const notasMap = {};
+  [...(remoto.notas || []), ...(estado.notas || [])].forEach(n => { if (n && n.quando) notasMap[n.quando] = n; });
+  const notas = Object.values(notasMap).sort((a,b) => (b.quando||'').localeCompare(a.quando||''));
+  // historico: dedupe por quando+med+acao
+  const histMap = {};
+  [...(remoto.historico || []), ...(estado.historico || [])].forEach(h => {
+    if (h && h.quando) histMap[h.quando + '|' + (h.med||'') + '|' + (h.acao||'')] = h;
+  });
+  const historico = Object.values(histMap).sort((a,b) => (b.quando||'').localeCompare(a.quando||'')).slice(0, 200);
+  // fotos: merge simples (local sobrescreve remoto se ambos existem)
+  const fotos = { ...(remoto.fotos || {}), ...(estado.fotos || {}) };
+
+  estado.feitas = feitas;
+  estado.notas = notas;
+  estado.historico = historico;
+  estado.fotos = fotos;
+}
+
+async function pullMerge(silencioso = false) {
+  if (!sb) return;
+  try {
+    if (!silencioso) setSyncStatus('☁️ sincronizando…', 'var(--texto-sec)');
+    const { data, error } = await sb.from('freddy_estado').select('dados, atualizado_em').eq('id', 1).maybeSingle();
+    if (error) throw error;
+    if (data && data.dados) {
+      mergeEstado(data.dados);
+      salvarLocal();
+      renderTudo();
+    }
+    _ultimaSync = new Date();
+    setSyncStatus('☁️ sincronizado', 'var(--verde)');
+  } catch(e) {
+    console.warn('pull falhou:', e);
+    setSyncStatus('⚠️ sync', 'var(--pendente)');
+  }
+}
+
+async function pushRemote() {
+  if (!sb || _syncando) return;
+  _syncando = true;
+  try {
+    setSyncStatus('☁️ enviando…', 'var(--texto-sec)');
+    // Merge com remoto antes de enviar (evita perder alterações do outro celular)
+    const { data: atual } = await sb.from('freddy_estado').select('dados').eq('id', 1).maybeSingle();
+    if (atual && atual.dados) mergeEstado(atual.dados);
+
+    const dados = {
+      feitas: estado.feitas || {},
+      notas: estado.notas || [],
+      historico: estado.historico || [],
+      fotos: estado.fotos || {},
+    };
+    const { error } = await sb.from('freddy_estado').upsert({
+      id: 1, dados, atualizado_em: new Date().toISOString()
+    });
+    if (error) throw error;
+    salvarLocal();
+    _ultimaSync = new Date();
+    setSyncStatus('☁️ sincronizado', 'var(--verde)');
+  } catch(e) {
+    console.warn('push falhou:', e);
+    setSyncStatus('⚠️ sync', 'var(--pendente)');
+  } finally {
+    _syncando = false;
+  }
+}
+
+function agendarPush() {
+  if (!sb) return;
+  if (_pushDebounce) clearTimeout(_pushDebounce);
+  _pushDebounce = setTimeout(pushRemote, 1500);
+}
+
+function iniciarSubscribe() {
+  if (!sb) return;
+  try {
+    sb.channel('freddy_estado_ch')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'freddy_estado' }, () => {
+        if (_syncando) return;
+        pullMerge(true);
+      })
+      .subscribe();
+  } catch(e) { console.warn('subscribe falhou:', e); }
+}
+
+// Puxa novamente quando o app volta ao foco
+document.addEventListener('visibilitychange', () => {
+  if (!document.hidden) pullMerge(true);
+});
+window.addEventListener('online', () => { setSyncStatus('☁️ online…', 'var(--texto-sec)'); pullMerge(); });
+window.addEventListener('offline', () => setSyncStatus('📴 offline', 'var(--texto-fraco)'));
 
 /* =========================================================
    HELPERS
@@ -2212,6 +2343,13 @@ registrarSW().then(() => {
     setTimeout(reagendarTodas, 1500);
   }
 });
+// Sincronização
+if (sb) {
+  setSyncStatus('☁️ conectando…', 'var(--texto-sec)');
+  pullMerge().then(() => iniciarSubscribe());
+} else {
+  setSyncStatus('📴 sem sync', 'var(--texto-fraco)');
+}
 
 // Atualiza a cada minuto o "atrasada" / próxima dose
 setInterval(() => {

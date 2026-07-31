@@ -1,5 +1,5 @@
 // Service Worker — Cuidados do Freddy
-const CACHE = 'freddy-v5';
+const CACHE = 'freddy-v6';
 const ARQUIVOS = [
   './',
   './index.html',
