@@ -769,6 +769,33 @@
   }
   body.locked { overflow: hidden; }
   body.locked > *:not(#lock):not(script) { display: none !important; }
+  /* ---- Administrador / editor de remédios ---- */
+  .admin-barra { display:flex; justify-content:space-between; align-items:center; gap:0.75rem; flex-wrap:wrap;
+    background: var(--amarelo); border:1px solid var(--border); border-radius:10px; padding:0.75rem 1rem; margin-bottom:1rem; }
+  .med-admin-acoes { display:flex; gap:0.4rem; flex-wrap:wrap; margin-top:0.75rem; }
+  .tag-pausado { background: var(--pendente-bg); color: var(--pendente); }
+  .modal { position:fixed; inset:0; background:rgba(0,0,0,0.45); display:none; align-items:flex-start; justify-content:center;
+    z-index:1000; overflow-y:auto; padding:1rem; }
+  .modal.aberto { display:flex; }
+  .modal-caixa { background: var(--bege-card); border-radius:12px; width:100%; max-width:560px; padding:1.25rem; margin:1rem 0;
+    box-shadow:0 10px 40px rgba(0,0,0,0.2); }
+  .modal-caixa h3 { font-size:1.5rem; color:var(--verde-escuro); margin-bottom:0.75rem; }
+  .modal-acoes { display:flex; justify-content:flex-end; gap:0.5rem; margin-top:1rem; position:sticky; bottom:0;
+    background:var(--bege-card); padding-top:0.5rem; }
+  .form-campo { margin-bottom:0.7rem; }
+  .form-campo label { display:block; font-size:0.8rem; color:var(--texto-sec); margin-bottom:0.2rem; }
+  .form-campo input[type=text], .form-campo input[type=date], .form-campo input[type=number],
+  .form-campo select, .form-campo textarea, .campo-txt {
+    width:100%; padding:0.5rem; border:1px solid var(--border); border-radius:6px; font-family:inherit; font-size:0.95rem; background:#fff; }
+  .form-linha { display:flex; gap:0.6rem; flex-wrap:wrap; }
+  .form-linha > .form-campo { flex:1 1 140px; }
+  .regra { border:1px solid var(--border-suave); border-radius:8px; padding:0.75rem; margin-bottom:0.6rem; background:#fff; }
+  .regra-dias { display:flex; gap:0.4rem; flex-wrap:wrap; }
+  .regra-dias label { display:flex; align-items:center; gap:0.2rem; font-size:0.85rem; color:var(--texto); }
+  .dica { font-size:0.8rem; color:var(--texto-fraco); margin:0.25rem 0 0.5rem; }
+  .ntfy-topico { font-family:monospace; font-size:1rem; background:var(--verde-suave); padding:0.4rem 0.6rem; border-radius:6px;
+    word-break:break-all; display:inline-block; }
+  .ajuste-titulo { font-family:'Cormorant Garamond',serif; font-size:1.25rem; color:var(--verde-escuro); margin-bottom:0.5rem; }
 </style>
 </head>
 <body class="locked">
@@ -930,6 +957,7 @@
       <input type="file" id="importar-file" style="display:none" accept="application/json">
     </div>
 
+    <div id="meds-admin"></div>
     <div id="meds-lista"></div>
   </section>
 
@@ -958,6 +986,9 @@
   <!-- NOTIFICAÇÕES -->
   <section class="aba" id="aba-notif">
     <h2 class="titulo-aba">🔔 Notificações</h2>
+
+    <div class="card" id="card-usuario"></div>
+    <div class="card" id="card-ntfy"></div>
     <div class="subtitulo-aba">Configure lembretes automáticos das doses do Freddy no seu celular.</div>
 
     <div class="card destaque">
@@ -1054,6 +1085,17 @@
   <div class="legenda" id="lightbox-legenda"></div>
 </div>
 
+<div id="modal-med" class="modal" onclick="if(event.target===this)fecharEditorMed()">
+  <div class="modal-caixa">
+    <h3 id="modal-med-titulo" class="serif">Remédio</h3>
+    <div id="modal-med-corpo"></div>
+    <div class="modal-acoes">
+      <button class="btn sec" onclick="fecharEditorMed()">Cancelar</button>
+      <button class="btn" onclick="salvarEditorMed()">Salvar</button>
+    </div>
+  </div>
+</div>
+
 <input type="file" id="foto-input" accept="image/*" capture="environment" style="display:none">
 
 <script>
@@ -1063,258 +1105,118 @@
    ========================================================= */
 
 const INICIO_TRATAMENTO = '2026-07-28';
+const MEDS_PADRAO_T = '2026-07-28T00:00:00.000Z';
+const TIPOS_MED = { oral: 'Oral', injec: 'Injetável', topico: 'Tópico', banho: 'Banho' };
 
-// Cada medicamento tem uma função "gerarDoses(inicio, hoje)" que devolve
-// {data: 'YYYY-MM-DD', hora: 'HH:MM', obs?: string}[] de todas as doses previstas.
-const MEDS = [
-  {
-    id: 'convenia',
-    numero: 1,
-    nome: 'Convenia',
-    tipo: 'injec',
-    tipoLabel: 'Injetável',
-    dosagem: '0,5 mL',
-    via: 'Subcutânea',
-    frequencia: 'Dose única',
-    valor: 'R$ 220,00 c/ aplicação',
-    instrucao: 'Aplicar 0,5 mL por injeção subcutânea em dose única. Aplicado na PoA Pet.',
-    ativo: true,
-    gerarDoses: () => [{ data: '2026-07-29', hora: '15:00', obs: 'Aplicado na PoA Pet' }]
-  },
-  {
-    id: 'cortavance',
-    numero: 2,
-    nome: 'Cortavance spray',
-    tipo: 'topico',
-    tipoLabel: 'Tópico',
-    dosagem: '2 borrifadas',
-    via: 'Interdígitos das 4 patas',
-    frequencia: 'Quartas e sábados por 15 dias',
-    instrucao: 'Aplicar 2 borrifadas nos interdígitos dos quatro membros nas quartas e sábados por 15 dias. Colocar o colar elisabetano por 10 minutos após cada aplicação.',
-    ativo: true,
-    gerarDoses: () => {
-      // Datas anotadas: 29/07 (4ªF), 01/08 (sáb), 05/08 (4ªF), 08/08 (sáb)
-      return [
-        { data: '2026-07-29', hora: '20:00' },
-        { data: '2026-08-01', hora: '20:00' },
-        { data: '2026-08-05', hora: '20:00' },
-        { data: '2026-08-08', hora: '20:00' },
-      ];
-    }
-  },
-  {
-    id: 'alcort',
-    numero: 3,
-    nome: 'Alcort 5mg',
-    tipo: 'oral',
-    tipoLabel: 'Oral',
-    dosagem: '½ comprimido',
-    via: 'Oral',
+// Remédios agora são DADOS (editáveis pelo administrador e sincronizados).
+// Cada remédio tem "regras" que geram as doses:
+//   {tipo:'datas', itens:[{data,hora,obs?}]}
+//   {tipo:'intervalo', inicio, fim?, cadaDias, horas:[...]}
+//   {tipo:'semana', inicio, fim?, dias:[0..6], horas:[...]}
+// Esta lista é só o ponto de partida (receita de 28/07/2026).
+const MEDS_PADRAO = [
+  { id: 'convenia', ordem: 1, nome: 'Convenia', tipo: 'injec', tipoLabel: 'Injetável', dosagem: '0,5 mL', via: 'Subcutânea',
+    frequencia: 'Dose única', valor: 'R$ 220,00 c/ aplicação',
+    instrucao: 'Aplicar 0,5 mL por injeção subcutânea em dose única. Aplicado na PoA Pet.', ativo: true,
+    regras: [{ tipo: 'datas', itens: [{ data: '2026-07-29', hora: '15:00', obs: 'Aplicado na PoA Pet' }] }] },
+  { id: 'cortavance', ordem: 2, nome: 'Cortavance spray', tipo: 'topico', tipoLabel: 'Tópico', dosagem: '2 borrifadas',
+    via: 'Interdígitos das 4 patas', frequencia: 'Quartas e sábados por 15 dias',
+    instrucao: 'Aplicar 2 borrifadas nos interdígitos dos quatro membros nas quartas e sábados por 15 dias. Colocar o colar elisabetano por 10 minutos após cada aplicação.', ativo: true,
+    regras: [{ tipo: 'datas', itens: ['2026-07-29','2026-08-01','2026-08-05','2026-08-08'].map(d => ({ data: d, hora: '20:00' })) }] },
+  { id: 'alcort', ordem: 3, nome: 'Alcort 5mg', tipo: 'oral', tipoLabel: 'Oral', dosagem: '½ comprimido', via: 'Oral',
     frequencia: 'A cada 24h por 8 dias, depois a cada 48h por mais 8 dias',
-    instrucao: 'Dar ½ comprimido a cada 24 horas por 8 dias. Posteriormente, dar ½ comprimido a cada 48 horas (em dias alternados) por mais 8 dias até completar 16 dias de tratamento.',
-    ativo: true,
-    gerarDoses: () => {
-      // Anotado: 28/07-noite, 29/07-12h, 30/07, 31/07, 01/08, 02/08, 03/08, 04/08
-      // Depois: 06/08, 08/08, 10/08, 12/08, 14/08, 16/08, 18/08, 20/08
-      return [
-        { data: '2026-07-28', hora: '22:00' },
-        { data: '2026-07-29', hora: '22:00' },
-        { data: '2026-07-30', hora: '22:00' },
-        { data: '2026-07-31', hora: '22:00' },
-        { data: '2026-08-01', hora: '22:00' },
-        { data: '2026-08-02', hora: '22:00' },
-        { data: '2026-08-03', hora: '22:00' },
-        { data: '2026-08-04', hora: '22:00' },
-        { data: '2026-08-06', hora: '22:00' },
-        { data: '2026-08-08', hora: '22:00' },
-        { data: '2026-08-10', hora: '22:00' },
-        { data: '2026-08-12', hora: '22:00' },
-        { data: '2026-08-14', hora: '22:00' },
-        { data: '2026-08-16', hora: '22:00' },
-        { data: '2026-08-18', hora: '22:00' },
-        { data: '2026-08-20', hora: '22:00' },
-      ];
-    }
-  },
-  {
-    id: 'apoquel',
-    numero: 4,
-    nome: 'Apoquel 3,6mg',
-    tipo: 'oral',
-    tipoLabel: 'Oral',
-    dosagem: '½ comprimido',
-    via: 'Oral',
+    instrucao: 'Dar ½ comprimido a cada 24 horas por 8 dias. Posteriormente, dar ½ comprimido a cada 48 horas (em dias alternados) por mais 8 dias até completar 16 dias de tratamento.', ativo: true,
+    regras: [{ tipo: 'datas', itens: ['2026-07-28','2026-07-29','2026-07-30','2026-07-31','2026-08-01','2026-08-02','2026-08-03','2026-08-04',
+      '2026-08-06','2026-08-08','2026-08-10','2026-08-12','2026-08-14','2026-08-16','2026-08-18','2026-08-20'].map(d => ({ data: d, hora: '22:00' })) }] },
+  { id: 'apoquel', ordem: 4, nome: 'Apoquel 3,6mg', tipo: 'oral', tipoLabel: 'Oral', dosagem: '½ comprimido', via: 'Oral',
     frequencia: 'A cada 12h — iniciar após os 8 primeiros dias do Alcort',
-    instrucao: 'Dar ½ comprimido a cada 12 horas até nova recomendação. Iniciar após os primeiros 8 dias do Alcort (a partir de 05/08).',
-    ativo: true,
-    inicio: '2026-08-05',
-    // Gera doses até HOJE+30 dias (uso contínuo)
-    gerarDoses: (hoje) => {
-      const doses = [];
-      const inicio = new Date('2026-08-05T10:00:00');
-      const limite = new Date(hoje);
-      limite.setDate(limite.getDate() + 30);
-      const cursor = new Date(inicio);
-      while (cursor <= limite) {
-        doses.push({ data: fmtISO(cursor), hora: '10:00' });
-        const noite = new Date(cursor); noite.setHours(22, 0);
-        doses.push({ data: fmtISO(noite), hora: '22:00' });
-        cursor.setDate(cursor.getDate() + 1);
-      }
-      return doses;
-    }
-  },
-  {
-    id: 'dermaskin',
-    numero: 5,
-    nome: 'Derma Skin PEA',
-    tipo: 'oral',
-    tipoLabel: 'Oral',
-    dosagem: '1 comprimido',
-    via: 'Oral',
-    frequencia: 'Diário — uso contínuo',
-    instrucao: 'Dar 1 comprimido ao dia em uso contínuo.',
-    ativo: true,
-    gerarDoses: (hoje) => {
-      const doses = [];
-      const inicio = new Date(INICIO_TRATAMENTO + 'T09:00:00');
-      const limite = new Date(hoje); limite.setDate(limite.getDate() + 30);
-      const cursor = new Date(inicio);
-      while (cursor <= limite) {
-        doses.push({ data: fmtISO(cursor), hora: '09:00' });
-        cursor.setDate(cursor.getDate() + 1);
-      }
-      return doses;
-    }
-  },
-  {
-    id: 'complederm',
-    numero: 6,
-    nome: 'Complederm',
-    tipo: 'oral',
-    tipoLabel: 'Oral',
-    dosagem: '1 sachê (4 mL)',
-    via: 'Adicionar na ração',
+    instrucao: 'Dar ½ comprimido a cada 12 horas até nova recomendação. Iniciar após os primeiros 8 dias do Alcort (a partir de 05/08).', ativo: true,
+    regras: [{ tipo: 'intervalo', inicio: '2026-08-05', cadaDias: 1, horas: ['10:00', '22:00'] }] },
+  { id: 'dermaskin', ordem: 5, nome: 'Derma Skin PEA', tipo: 'oral', tipoLabel: 'Oral', dosagem: '1 comprimido', via: 'Oral',
+    frequencia: 'Diário — uso contínuo', instrucao: 'Dar 1 comprimido ao dia em uso contínuo.', ativo: true,
+    regras: [{ tipo: 'intervalo', inicio: '2026-07-28', cadaDias: 1, horas: ['09:00'] }] },
+  { id: 'complederm', ordem: 6, nome: 'Complederm', tipo: 'oral', tipoLabel: 'Oral', dosagem: '1 sachê (4 mL)', via: 'Adicionar na ração',
     frequencia: '1x/dia por 60 dias, depois em dias alternados',
-    instrucao: 'Inicialmente adicionar 1 sachê na ração uma vez ao dia, por 60 dias. Posteriormente, adicionar 1 sachê na ração a cada 48 horas (em dias alternados) em uso contínuo.',
-    ativo: true,
-    gerarDoses: (hoje) => {
-      const doses = [];
-      const inicio = new Date(INICIO_TRATAMENTO + 'T09:00:00');
-      const fase1Fim = new Date(inicio); fase1Fim.setDate(fase1Fim.getDate() + 59); // 60 dias
-      const limite = new Date(hoje); limite.setDate(limite.getDate() + 30);
-      const cursor = new Date(inicio);
-      // fase 1: diário
-      while (cursor <= fase1Fim && cursor <= limite) {
-        doses.push({ data: fmtISO(cursor), hora: '09:00' });
-        cursor.setDate(cursor.getDate() + 1);
-      }
-      // fase 2: alternado
-      while (cursor <= limite) {
-        doses.push({ data: fmtISO(cursor), hora: '09:00' });
-        cursor.setDate(cursor.getDate() + 2);
-      }
-      return doses;
-    }
-  },
-  {
-    id: 'simparic',
-    numero: 7,
-    nome: 'Simparic 10mg',
-    tipo: 'oral',
-    tipoLabel: 'Oral · antipulgas',
-    dosagem: '1 comprimido',
-    via: 'Oral',
-    frequencia: 'A cada 35 dias — uso contínuo',
-    instrucao: 'Dar 1 comprimido a cada 35 dias em uso contínuo. (Cães de 2,6 a 5 kg.)',
-    ativo: true,
-    gerarDoses: (hoje) => {
-      const doses = [];
-      const inicio = new Date(INICIO_TRATAMENTO + 'T09:00:00');
-      const limite = new Date(hoje); limite.setDate(limite.getDate() + 90);
-      const cursor = new Date(inicio);
-      while (cursor <= limite) {
-        doses.push({ data: fmtISO(cursor), hora: '09:00' });
-        cursor.setDate(cursor.getDate() + 35);
-      }
-      return doses;
-    }
-  },
-  {
-    id: 'sebotrat',
-    numero: 8,
-    nome: 'Sebotrat "O" xampu',
-    tipo: 'banho',
-    tipoLabel: 'Banho — 1º passo',
-    dosagem: 'Banho',
-    via: 'Aplicar como banho',
+    instrucao: 'Inicialmente adicionar 1 sachê na ração uma vez ao dia, por 60 dias. Posteriormente, adicionar 1 sachê na ração a cada 48 horas (em dias alternados) em uso contínuo.', ativo: true,
+    regras: [
+      { tipo: 'intervalo', inicio: '2026-07-28', fim: '2026-09-25', cadaDias: 1, horas: ['09:00'] },
+      { tipo: 'intervalo', inicio: '2026-09-26', cadaDias: 2, horas: ['09:00'] },
+    ] },
+  { id: 'simparic', ordem: 7, nome: 'Simparic 10mg', tipo: 'oral', tipoLabel: 'Oral · antipulgas', dosagem: '1 comprimido', via: 'Oral',
+    frequencia: 'A cada 35 dias — uso contínuo', instrucao: 'Dar 1 comprimido a cada 35 dias em uso contínuo. (Cães de 2,6 a 5 kg.)', ativo: true,
+    regras: [{ tipo: 'intervalo', inicio: '2026-07-28', cadaDias: 35, horas: ['09:00'] }] },
+  { id: 'sebotrat', ordem: 8, nome: 'Sebotrat "O" xampu', tipo: 'banho', tipoLabel: 'Banho — 1º passo', dosagem: 'Banho', via: 'Aplicar como banho',
     frequencia: 'Quartas e sábados por 30 dias',
-    instrucao: 'Aplicar sob a forma de banhos. Deixe ensaboado por 10 minutos e enxágue. Faça o procedimento às quartas e sábados por 30 dias.',
-    ativo: true,
-    gerarDoses: () => {
-      // Datas dos banhos quartas e sábados por 30 dias a partir de 29/07/2026 (quarta)
-      const doses = [];
-      const inicio = new Date('2026-07-29T18:00:00');
-      const fim = new Date(inicio); fim.setDate(fim.getDate() + 30);
-      const cursor = new Date(inicio);
-      while (cursor <= fim) {
-        const dow = cursor.getDay(); // 3 = quarta, 6 = sábado
-        if (dow === 3 || dow === 6) {
-          doses.push({ data: fmtISO(cursor), hora: '18:00' });
-        }
-        cursor.setDate(cursor.getDate() + 1);
-      }
-      return doses;
-    }
-  },
-  {
-    id: 'hidrapet',
-    numero: 9,
-    nome: 'Hidrapet xampu',
-    tipo: 'banho',
-    tipoLabel: 'Banho — 2º passo',
-    dosagem: 'Banho',
-    via: 'Após enxágue do Sebotrat',
+    instrucao: 'Aplicar sob a forma de banhos. Deixe ensaboado por 10 minutos e enxágue. Faça o procedimento às quartas e sábados por 30 dias.', ativo: true,
+    regras: [{ tipo: 'semana', inicio: '2026-07-29', fim: '2026-08-28', dias: [3, 6], horas: ['18:00'] }] },
+  { id: 'hidrapet', ordem: 9, nome: 'Hidrapet xampu', tipo: 'banho', tipoLabel: 'Banho — 2º passo', dosagem: 'Banho', via: 'Após enxágue do Sebotrat',
     frequencia: '1x/semana em uso contínuo',
-    instrucao: 'Imediatamente após o enxágue do Sebotrat "O", aplicar sob a forma de banhos. Deixar ensaboado por 10 minutos e enxaguar. Fazer o procedimento uma vez por semana em uso contínuo.',
-    ativo: true,
-    gerarDoses: (hoje) => {
-      // 1x/semana. Aos sábados, junto com o Sebotrat.
-      const doses = [];
-      const inicio = new Date('2026-08-01T18:00:00'); // primeiro sábado
-      const limite = new Date(hoje); limite.setDate(limite.getDate() + 60);
-      const cursor = new Date(inicio);
-      while (cursor <= limite) {
-        doses.push({ data: fmtISO(cursor), hora: '18:15' });
-        cursor.setDate(cursor.getDate() + 7);
-      }
-      return doses;
-    }
-  },
-  {
-    id: 'phisioderm-cond',
-    numero: 10,
-    nome: 'Phisioderm Condicionador',
-    tipo: 'banho',
-    tipoLabel: 'Banho — 3º passo',
-    dosagem: 'Aplicar no pelo molhado',
-    via: 'Após enxágue do Hidrapet',
-    frequencia: '1x/semana em uso contínuo',
-    instrucao: 'Imediatamente após o enxágue do Hidrapet xampú, aplicar o condicionador sobre o pelo molhado, espalhando por todo o corpo. Deixar agir por 5 minutos, enxaguar e secar com o secador levemente morno. Fazer o procedimento uma vez por semana em uso contínuo.',
-    ativo: true,
-    gerarDoses: (hoje) => {
-      const doses = [];
-      const inicio = new Date('2026-08-01T18:00:00');
-      const limite = new Date(hoje); limite.setDate(limite.getDate() + 60);
-      const cursor = new Date(inicio);
-      while (cursor <= limite) {
-        doses.push({ data: fmtISO(cursor), hora: '18:30' });
-        cursor.setDate(cursor.getDate() + 7);
-      }
-      return doses;
-    }
-  },
+    instrucao: 'Imediatamente após o enxágue do Sebotrat "O", aplicar sob a forma de banhos. Deixar ensaboado por 10 minutos e enxaguar. Fazer o procedimento uma vez por semana em uso contínuo.', ativo: true,
+    regras: [{ tipo: 'intervalo', inicio: '2026-08-01', cadaDias: 7, horas: ['18:15'] }] },
+  { id: 'phisioderm-cond', ordem: 10, nome: 'Phisioderm Condicionador', tipo: 'banho', tipoLabel: 'Banho — 3º passo', dosagem: 'Aplicar no pelo molhado',
+    via: 'Após enxágue do Hidrapet', frequencia: '1x/semana em uso contínuo',
+    instrucao: 'Imediatamente após o enxágue do Hidrapet xampú, aplicar o condicionador sobre o pelo molhado, espalhando por todo o corpo. Deixar agir por 5 minutos, enxaguar e secar com o secador levemente morno. Fazer o procedimento uma vez por semana em uso contínuo.', ativo: true,
+    regras: [{ tipo: 'intervalo', inicio: '2026-08-01', cadaDias: 7, horas: ['18:30'] }] },
 ];
+
+function medsPadrao() {
+  return MEDS_PADRAO.map(m => ({ ...JSON.parse(JSON.stringify(m)), atualizado: MEDS_PADRAO_T }));
+}
+
+function addDias(iso, n) {
+  const d = new Date(iso + 'T12:00:00');
+  d.setDate(d.getDate() + n);
+  return fmtISO(d);
+}
+
+// Gera {data, hora, obs?}[] a partir das regras de um remédio
+function gerarDosesRegras(regras, hojeDate) {
+  const hoje = fmtISO(hojeDate);
+  const out = [];
+  const vistos = new Set();
+  const add = (data, hora, obs) => {
+    const k = data + '|' + hora;
+    if (vistos.has(k)) return;
+    vistos.add(k);
+    out.push(obs ? { data, hora, obs } : { data, hora });
+  };
+  for (const r of (regras || [])) {
+    if (!r) continue;
+    if (r.tipo === 'datas') {
+      for (const it of (r.itens || [])) if (it && it.data && it.hora) add(it.data, it.hora, it.obs);
+      continue;
+    }
+    const horas = [...(r.horas || [])].sort();
+    if (!r.inicio || horas.length === 0) continue;
+    const passo = r.tipo === 'intervalo' ? Math.max(1, parseInt(r.cadaDias, 10) || 1) : 1;
+    let limite = addDias(hoje, r.tipo === 'intervalo' ? Math.max(30, passo * 2) : 30);
+    if (r.fim && r.fim < limite) limite = r.fim;
+    let cur = r.inicio, guarda = 0;
+    while (cur <= limite && guarda++ < 3000) {
+      const ok = r.tipo === 'intervalo' || (r.dias || []).includes(new Date(cur + 'T12:00:00').getDay());
+      if (ok) for (const h of horas) add(cur, h);
+      cur = addDias(cur, passo);
+    }
+  }
+  return out;
+}
+
+// Lista "viva" usada pelo resto do app (montada a partir de estado.meds)
+let MEDS = [];
+function prepararMeds() {
+  const lista = (estado.meds || []).filter(m => m && m.id && !m.removido)
+    .sort((a, b) => (a.ordem || 0) - (b.ordem || 0));
+  MEDS = lista.map((m, i) => ({
+    ...m,
+    numero: i + 1,
+    tipoLabel: m.tipoLabel || TIPOS_MED[m.tipo] || 'Outro',
+    gerarDoses: (h) => gerarDosesRegras(m.regras, h),
+  }));
+}
+
+function esc(s) {
+  return String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+}
 
 /* =========================================================
    ESTADO PERSISTENTE
@@ -1322,26 +1224,29 @@ const MEDS = [
 const STORAGE_KEY = 'freddy-cuidados-v1';
 let estado = carregar();
 migrarFeitas();
+prepararMeds();
 
 function carregar() {
-  const padrao = {
-    feitas: {}, notas: [], historico: [], semanaOffset: 0, fotos: {},
-    notif: { ativo: false, antecMin: 10, repetir: false }
-  };
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
-    if (!raw) return padrao;
-    const s = JSON.parse(raw);
-    s.feitas = s.feitas || {};
-    s.notas = s.notas || [];
-    s.historico = s.historico || [];
-    s.fotos = s.fotos || {};
-    s.semanaOffset = 0;
-    s.notif = { ...padrao.notif, ...(s.notif || {}) };
-    return s;
+    return normalizarEstado(raw ? JSON.parse(raw) : {});
   } catch(e) {
-    return padrao;
+    return normalizarEstado({});
   }
+}
+function normalizarEstado(s) {
+  s = s || {};
+  s.feitas = s.feitas || {};
+  s.notas = s.notas || [];
+  s.historico = s.historico || [];
+  s.fotos = s.fotos || {};
+  s.semanaOffset = 0;
+  s.notif = { ativo: false, antecMin: 10, repetir: false, ...(s.notif || {}) };
+  s.meds = (Array.isArray(s.meds) && s.meds.length) ? s.meds : medsPadrao();
+  s.config = s.config || {};            // sincronizado: ntfyTopico, adminHash
+  s.eu = { nome: '', admin: false, ...(s.eu || {}) };   // só deste celular
+  s.filaAvisos = Array.isArray(s.filaAvisos) ? s.filaAvisos : [];
+  return s;
 }
 function salvarLocal() {
   try { localStorage.setItem(STORAGE_KEY, JSON.stringify(estado)); }
@@ -1421,10 +1326,25 @@ function mergeEstado(remoto) {
   // fotos: merge simples (local sobrescreve remoto se ambos existem)
   const fotos = { ...(remoto.fotos || {}), ...(estado.fotos || {}) };
 
+  // remédios: por id, o mais recente (atualizado) vence; exclusão = removido:true
+  const medsMap = {};
+  for (const m of [...(remoto.meds || []), ...(estado.meds || [])]) {
+    if (!m || !m.id) continue;
+    const a = medsMap[m.id];
+    if (!a || (m.atualizado || '') >= (a.atualizado || '')) medsMap[m.id] = m;
+  }
+  const meds = Object.values(medsMap);
+  // config: o mais recente vence
+  const lc = estado.config || {}, rc = remoto.config || {};
+  const config = (lc.atualizado || '') >= (rc.atualizado || '') ? lc : rc;
+
   estado.feitas = feitas;
   estado.notas = notas;
   estado.historico = historico;
   estado.fotos = fotos;
+  if (meds.length) estado.meds = meds;
+  estado.config = config;
+  prepararMeds();
 }
 
 async function pullMerge(silencioso = false) {
@@ -1437,6 +1357,8 @@ async function pullMerge(silencioso = false) {
       mergeEstado(data.dados);
       salvarLocal();
       renderTudo();
+      // Se outro celular com versão antiga apagou remédios/config da nuvem, reenvia
+      if (!data.dados.meds || (!data.dados.config && estado.config.atualizado)) agendarPush();
     }
     _ultimaSync = new Date();
     setSyncStatus('☁️ sincronizado', 'var(--verde)');
@@ -1460,6 +1382,8 @@ async function pushRemote() {
       notas: estado.notas || [],
       historico: estado.historico || [],
       fotos: estado.fotos || {},
+      meds: estado.meds || [],
+      config: estado.config || {},
     };
     const { error } = await sb.from('freddy_estado').upsert({
       id: 1, dados, atualizado_em: new Date().toISOString()
@@ -1498,7 +1422,7 @@ function iniciarSubscribe() {
 document.addEventListener('visibilitychange', () => {
   if (!document.hidden) pullMerge(true);
 });
-window.addEventListener('online', () => { setSyncStatus('☁️ online…', 'var(--texto-sec)'); pullMerge(); });
+window.addEventListener('online', () => { setSyncStatus('☁️ online…', 'var(--texto-sec)'); pullMerge(); enviarFilaAvisos(); });
 window.addEventListener('offline', () => setSyncStatus('📴 offline', 'var(--texto-fraco)'));
 
 /* =========================================================
@@ -1542,6 +1466,7 @@ function todasDoses(hoje) {
 }
 
 function marcarDose(medId, data, hora, feita) {
+  garantirNome();
   const k = keyDose(medId, data, hora);
   const med = MEDS.find(m => m.id === medId);
   const agora = new Date().toISOString();
@@ -1551,12 +1476,14 @@ function marcarDose(medId, data, hora, feita) {
     quando: agora,
     med: med.nome,
     dose: `${med.dosagem} · ${data} ${hora}`,
-    acao: feita ? 'marcado como dado' : 'desmarcado'
+    acao: feita ? 'marcado como dado' : 'desmarcado',
+    quem: estado.eu.nome || ''
   });
   estado.historico = estado.historico.slice(0, 200);
   salvar();
   renderTudo();
   toast(feita ? '✓ Marcado como dado' : 'Desmarcado');
+  avisarAdmin(med, data, hora, feita);
   // Cancela ou reagenda a notificação relacionada
   if ('Notification' in window && Notification.permission === 'granted' && swReg) {
     swReg.getNotifications({ tag: k }).then(ns => ns.forEach(n => n.close())).catch(()=>{});
@@ -1600,7 +1527,7 @@ function renderHoje() {
     return t >= agora;
   }) || pendentes[0];
   document.getElementById('stat-proxima').innerHTML = proxima
-    ? `${proxima.hora} <small>· ${proxima.med.nome.split(' ')[0]}</small>`
+    ? `${proxima.hora} <small>· ${esc(proxima.med.nome.split(' ')[0])}</small>`
     : '<small>sem doses</small>';
 
   // próximo banho
@@ -1655,10 +1582,10 @@ function renderDose(dose) {
     ${foto ? `<div class="dose-foto" style="width:42px;height:42px;border-radius:6px;overflow:hidden;flex-shrink:0;cursor:pointer;border:1px solid var(--border-suave);" data-foto="${dose.med.id}"><img src="${foto}" style="width:100%;height:100%;object-fit:cover;" alt=""></div>` : ''}
     <div class="info">
       <div class="nome-med">
-        ${dose.med.nome}
-        <span class="tag tag-${dose.med.tipo}">${dose.med.tipoLabel}</span>
+        ${esc(dose.med.nome)}
+        <span class="tag tag-${esc(dose.med.tipo)}">${esc(dose.med.tipoLabel)}</span>
       </div>
-      <div class="detalhes">${dose.med.dosagem} · ${dose.med.via}${dose.obs ? ' · ' + dose.obs : ''}</div>
+      <div class="detalhes">${esc(dose.med.dosagem)} · ${esc(dose.med.via)}${dose.obs ? ' · ' + esc(dose.obs) : ''}</div>
     </div>
     <div class="horario">${dose.hora}</div>
   `;
@@ -1713,7 +1640,7 @@ function renderSemana() {
         const feita = isFeita(k);
         const ev = document.createElement('div');
         ev.className = 'dia-evento ' + dose.med.tipo + (feita ? ' feito' : '');
-        ev.innerHTML = `<span class="n">${dose.med.nome.split(' ')[0]}</span><span class="h">${dose.hora}</span>`;
+        ev.innerHTML = `<span class="n">${esc(dose.med.nome.split(' ')[0])}</span><span class="h">${dose.hora}</span>`;
         ev.title = `${dose.med.nome} · ${dose.med.dosagem}\nClique para ${feita ? 'desmarcar' : 'marcar como dado'}`;
         ev.style.cursor = 'pointer';
         ev.addEventListener('click', () => marcarDose(dose.med.id, dose.data, dose.hora, !feita));
@@ -1732,6 +1659,13 @@ function renderMeds() {
   cont.innerHTML = '';
   const hoje = hojeISO();
   const todas = todasDoses(hoje);
+  const admin = !!estado.eu.admin;
+
+  const barra = document.getElementById('meds-admin');
+  barra.innerHTML = admin
+    ? `<div class="admin-barra"><span>👑 Modo administrador — você pode alterar os remédios.</span>
+         <button class="btn" onclick="abrirEditorMed()">+ Novo remédio</button></div>`
+    : '';
 
   for (const m of MEDS) {
     const doses = todas.filter(x => x.med.id === m.id);
@@ -1748,15 +1682,16 @@ function renderMeds() {
       <div class="med-cabecalho">
         <div class="med-nome">
           <span class="num">${m.numero}</span>
-          ${m.nome}
-          <span class="tag tag-${m.tipo}">${m.tipoLabel}</span>
+          ${esc(m.nome)}
+          <span class="tag tag-${esc(m.tipo)}">${esc(m.tipoLabel)}</span>
+          ${m.ativo === false ? '<span class="tag tag-pausado">Pausado</span>' : ''}
         </div>
       </div>
 
       <div class="med-foto-area">
         ${foto ? `
           <div class="med-foto-thumb" data-abrir="${m.id}">
-            <img src="${foto}" alt="${m.nome}">
+            <img src="${foto}" alt="${esc(m.nome)}">
           </div>
           <div class="med-foto-acoes">
             <button data-trocar="${m.id}">📷 Trocar</button>
@@ -1771,13 +1706,19 @@ function renderMeds() {
       </div>
 
       <div class="med-info">
-        <div class="campo"><div class="rot">Dosagem</div><div class="valor">${m.dosagem}</div></div>
-        <div class="campo"><div class="rot">Via</div><div class="valor">${m.via}</div></div>
-        <div class="campo"><div class="rot">Frequência</div><div class="valor">${m.frequencia}</div></div>
-        ${m.valor ? `<div class="campo"><div class="rot">Valor</div><div class="valor">${m.valor}</div></div>` : ''}
+        <div class="campo"><div class="rot">Dosagem</div><div class="valor">${esc(m.dosagem)}</div></div>
+        <div class="campo"><div class="rot">Via</div><div class="valor">${esc(m.via)}</div></div>
+        <div class="campo"><div class="rot">Frequência</div><div class="valor">${esc(m.frequencia)}</div></div>
+        ${m.valor ? `<div class="campo"><div class="rot">Valor</div><div class="valor">${esc(m.valor)}</div></div>` : ''}
         <div class="campo"><div class="rot">Próxima dose</div><div class="valor">${proxima ? fmtBR(proxima.data) + ' às ' + proxima.hora : '—'}</div></div>
       </div>
-      <div class="med-instrucao">${m.instrucao}</div>
+      <div class="med-instrucao" style="white-space:pre-line;">${esc(m.instrucao)}</div>
+      ${admin ? `
+        <div class="med-admin-acoes">
+          <button class="btn sec pequeno" data-editar="${m.id}">✏️ Editar</button>
+          <button class="btn sec pequeno" data-encerrar="${m.id}">⏹ Encerrar hoje</button>
+          <button class="btn sec pequeno" data-excluir="${m.id}">🗑 Excluir</button>
+        </div>` : ''}
       ${total > 0 ? `
         <div class="med-progresso">
           <span>${feitas} de ${total} doses previstas</span>
@@ -1796,6 +1737,12 @@ function renderMeds() {
     if (btnTr) btnTr.addEventListener('click', () => escolherFoto(m.id));
     const btnRm = card.querySelector('[data-remover]');
     if (btnRm) btnRm.addEventListener('click', () => removerFoto(m.id));
+    const bEd = card.querySelector('[data-editar]');
+    if (bEd) bEd.addEventListener('click', () => abrirEditorMed(m.id));
+    const bEn = card.querySelector('[data-encerrar]');
+    if (bEn) bEn.addEventListener('click', () => encerrarMed(m.id));
+    const bEx = card.querySelector('[data-excluir]');
+    if (bEx) bEx.addEventListener('click', () => excluirMed(m.id));
 
     cont.appendChild(card);
   }
@@ -2032,8 +1979,8 @@ function renderHistorico() {
     el.className = 'hist-item';
     el.innerHTML = `
       <div class="quando">${d.toLocaleString('pt-BR', {day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'})}</div>
-      <div class="o-que"><strong>${h.med}</strong> — ${h.dose}</div>
-      <div class="acao">${h.acao}</div>
+      <div class="o-que"><strong>${esc(h.med)}</strong> — ${esc(h.dose)}</div>
+      <div class="acao">${esc(h.acao)}${h.quem ? ' · por ' + esc(h.quem) : ''}</div>
     `;
     cont.appendChild(el);
   }
@@ -2072,8 +2019,7 @@ document.getElementById('importar-file').addEventListener('change', (e) => {
       const s = JSON.parse(ev.target.result);
       if (!s.feitas) throw new Error('Formato inválido');
       if (!confirm('Substituir dados atuais pelo backup importado?')) return;
-      estado = s;
-      estado.semanaOffset = 0;
+      estado = normalizarEstado(s);
       salvar();
       renderTudo();
       toast('Backup importado');
@@ -2309,7 +2255,7 @@ async function atualizarListaAgendadas() {
     const antecMs = (estado.notif.antecMin || 0) * 60_000;
     const disparo = new Date(d.quando.getTime() - antecMs);
     return `<div style="padding:0.4rem 0; border-bottom:1px solid var(--border-suave);">
-      <strong style="color:var(--verde-escuro);">${d.med.nome}</strong> · ${d.med.dosagem}<br>
+      <strong style="color:var(--verde-escuro);">${esc(d.med.nome)}</strong> · ${esc(d.med.dosagem)}<br>
       <span style="color:var(--texto-fraco);">Dose ${fmtBR(d.data)} ${d.hora} → notificar ${disparo.toLocaleString('pt-BR', {day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'})}</span>
     </div>`;
   }).join('');
@@ -2363,19 +2309,446 @@ function aplicarConfigNotif() {
   atualizarListaAgendadas();
 }
 
+
+/* =========================================================
+   USUÁRIO DESTE CELULAR + MODO ADMINISTRADOR
+   ========================================================= */
+async function hashTexto(s) {
+  const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(s));
+  return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2, '0')).join('');
+}
+
+function garantirNome() {
+  if (estado.eu.nome || estado.eu.admin) return;
+  const n = prompt('Qual é o seu nome? (aparece no histórico e no aviso para o administrador)');
+  if (n && n.trim()) { estado.eu.nome = n.trim().slice(0, 40); salvarLocal(); renderAjustes(); }
+}
+
+function salvarNome() {
+  const v = document.getElementById('eu-nome').value.trim().slice(0, 40);
+  estado.eu.nome = v;
+  salvarLocal();
+  renderAjustes();
+  toast(v ? '✓ Nome salvo' : 'Nome apagado');
+}
+
+async function entrarAdmin() {
+  const cfg = estado.config || {};
+  if (!cfg.adminHash) {
+    const p1 = prompt('Crie um PIN de administrador (mínimo 4 caracteres).\nQuem souber esse PIN poderá alterar os remédios.');
+    if (!p1) return;
+    if (p1.trim().length < 4) { alert('O PIN precisa ter pelo menos 4 caracteres.'); return; }
+    const p2 = prompt('Digite o PIN de novo para confirmar:');
+    if (p2 !== p1) { alert('Os PINs não conferem.'); return; }
+    estado.config = { ...cfg, adminHash: await hashTexto('freddy-admin:' + p1.trim()), atualizado: new Date().toISOString() };
+  } else {
+    const p = prompt('PIN de administrador:');
+    if (!p) return;
+    if (await hashTexto('freddy-admin:' + p.trim()) !== cfg.adminHash) { alert('PIN incorreto.'); return; }
+  }
+  estado.eu.admin = true;
+  salvar();
+  renderTudo();
+  toast('👑 Modo administrador ativado');
+}
+
+function sairAdmin() {
+  estado.eu.admin = false;
+  salvarLocal();
+  renderTudo();
+  toast('Modo administrador desativado');
+}
+
+function renderAjustes() {
+  const cu = document.getElementById('card-usuario');
+  const cn = document.getElementById('card-ntfy');
+  if (!cu || !cn) return;
+  const admin = !!estado.eu.admin;
+  cu.innerHTML = `
+    <div class="ajuste-titulo">👤 Quem usa este celular</div>
+    <div class="form-linha" style="align-items:flex-end;">
+      <div class="form-campo" style="flex:1 1 200px; margin-bottom:0;">
+        <label for="eu-nome">Seu nome</label>
+        <input type="text" id="eu-nome" class="campo-txt" maxlength="40" placeholder="Ex.: Maria" value="${esc(estado.eu.nome)}">
+      </div>
+      <button class="btn sec" onclick="salvarNome()">Salvar nome</button>
+    </div>
+    <p class="dica" style="margin-top:0.6rem;">
+      ${admin ? '👑 Este celular está no <strong>modo administrador</strong>: pode alterar os remédios e recebe os avisos.'
+              : 'Este celular está no modo <strong>cuidador</strong>: marca as doses dadas.'}
+    </p>
+    ${admin ? '<button class="btn sec pequeno" onclick="sairAdmin()">Sair do modo administrador</button>'
+            : '<button class="btn sec pequeno" onclick="entrarAdmin()">Entrar como administrador</button>'}
+  `;
+
+  const topico = estado.config && estado.config.ntfyTopico;
+  if (admin) {
+    cn.innerHTML = `
+      <div class="ajuste-titulo">📲 Aviso quando derem um remédio</div>
+      ${topico ? `
+        <p style="font-size:0.9rem; color:var(--texto-sec); margin-bottom:0.5rem;">
+          Quando outra pessoa marcar uma dose, chega um aviso no seu celular pelo app gratuito <strong>ntfy</strong>,
+          mesmo com o Freddy Cuidados fechado.
+        </p>
+        <ol style="font-size:0.9rem; color:var(--texto-sec); padding-left:1.2rem; margin-bottom:0.75rem;">
+          <li>Instale o app <strong>ntfy</strong> (Play Store ou App Store).</li>
+          <li>No ntfy, toque em <strong>+</strong> (inscrever-se em tópico).</li>
+          <li>Digite exatamente este tópico (servidor padrão ntfy.sh):</li>
+        </ol>
+        <div style="display:flex; gap:0.5rem; align-items:center; flex-wrap:wrap; margin-bottom:0.75rem;">
+          <span class="ntfy-topico">${esc(topico)}</span>
+          <button class="btn sec pequeno" onclick="copiarTopico()">Copiar</button>
+        </div>
+        <div style="display:flex; gap:0.5rem; flex-wrap:wrap;">
+          <button class="btn" onclick="testarAviso()">Enviar aviso de teste</button>
+          <button class="btn sec" onclick="novoTopico()">Gerar novo tópico</button>
+        </div>
+        <p class="dica" style="margin-top:0.6rem;">Guarde o tópico só para você: quem souber o nome dele também consegue ver os avisos.</p>
+      ` : `
+        <p style="font-size:0.9rem; color:var(--texto-sec); margin-bottom:0.75rem;">
+          Ative para receber um aviso no celular sempre que outra pessoa marcar um remédio como dado.
+        </p>
+        <button class="btn" onclick="novoTopico()">Ativar avisos</button>
+      `}
+    `;
+  } else {
+    cn.innerHTML = `
+      <div class="ajuste-titulo">📲 Aviso ao administrador</div>
+      <p style="font-size:0.9rem; color:var(--texto-sec);">
+        ${topico ? '✅ Quando você marcar um remédio como dado, o administrador recebe um aviso no celular.'
+                 : 'O administrador ainda não ativou os avisos.'}
+      </p>
+      ${estado.filaAvisos.length ? `<p class="dica">⏳ ${estado.filaAvisos.length} aviso(s) esperando internet para enviar.</p>` : ''}
+    `;
+  }
+}
+
+/* =========================================================
+   AVISOS AO ADMINISTRADOR (ntfy.sh)
+   ========================================================= */
+let _enviandoAvisos = false;
+
+function novoTopico() {
+  if (estado.config.ntfyTopico && !confirm('Gerar um tópico novo? Você vai precisar se inscrever de novo no app ntfy.')) return;
+  const rnd = Array.from(crypto.getRandomValues(new Uint8Array(8))).map(b => b.toString(16).padStart(2, '0')).join('');
+  estado.config = { ...estado.config, ntfyTopico: 'freddy-' + rnd, atualizado: new Date().toISOString() };
+  salvar();
+  renderAjustes();
+  toast('Tópico criado — agora inscreva-se no app ntfy');
+}
+
+function copiarTopico() {
+  const t = estado.config.ntfyTopico;
+  if (!t) return;
+  (navigator.clipboard ? navigator.clipboard.writeText(t) : Promise.reject())
+    .then(() => toast('Tópico copiado'))
+    .catch(() => prompt('Copie o tópico:', t));
+}
+
+async function publicarNtfy(msg) {
+  const r = await fetch('https://ntfy.sh/', { method: 'POST', body: JSON.stringify(msg) });
+  return r;
+}
+
+async function testarAviso() {
+  const topic = estado.config.ntfyTopico;
+  if (!topic) return;
+  try {
+    const r = await publicarNtfy({ topic, title: '🐶 Teste — Freddy Cuidados', message: 'Se você está vendo isto, os avisos estão funcionando!', tags: ['dog'] });
+    toast(r.ok ? '✓ Aviso de teste enviado' : 'Falhou (' + r.status + ')');
+  } catch (e) {
+    toast('Sem internet para enviar o teste');
+  }
+}
+
+function avisarAdmin(med, data, hora, feita) {
+  const topic = estado.config && estado.config.ntfyTopico;
+  if (!topic || !med || estado.eu.admin) return;   // o próprio admin não se avisa
+  const quem = estado.eu.nome || 'Alguém';
+  const agora = new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+  estado.filaAvisos.push({
+    topic,
+    title: feita ? `✅ ${med.nome} — dado` : `↩️ ${med.nome} — desmarcado`,
+    message: `${quem} ${feita ? 'marcou como dado' : 'desmarcou'}: ${med.dosagem}, dose de ${fmtBR(data).slice(0, 5)} às ${hora}. (registrado às ${agora})`,
+    tags: ['dog'],
+  });
+  estado.filaAvisos = estado.filaAvisos.slice(-30);
+  salvarLocal();
+  enviarFilaAvisos();
+}
+
+async function enviarFilaAvisos() {
+  if (_enviandoAvisos || !estado.filaAvisos || !estado.filaAvisos.length) return;
+  _enviandoAvisos = true;
+  try {
+    while (estado.filaAvisos.length) {
+      const r = await publicarNtfy(estado.filaAvisos[0]);
+      if (!r.ok && r.status >= 500) throw new Error('ntfy ' + r.status);
+      estado.filaAvisos.shift();   // enviado (ou recusado de vez) — tira da fila
+      salvarLocal();
+    }
+  } catch (e) {
+    console.warn('aviso ntfy falhou, tento de novo depois:', e);
+  } finally {
+    _enviandoAvisos = false;
+    renderAjustes();
+  }
+}
+
+/* =========================================================
+   EDITOR DE REMÉDIOS (administrador)
+   ========================================================= */
+let _edit = null;   // { med, novo }
+
+function abrirEditorMed(medId) {
+  if (!estado.eu.admin) return;
+  const orig = medId ? estado.meds.find(m => m.id === medId) : null;
+  const med = orig ? JSON.parse(JSON.stringify(orig)) : {
+    id: '', nome: '', tipo: 'oral', tipoLabel: '', dosagem: '', via: 'Oral', frequencia: '', valor: '', instrucao: '', ativo: true,
+    regras: [{ tipo: 'intervalo', inicio: hojeISO(), cadaDias: 1, horas: ['09:00'] }],
+  };
+  _edit = { med, novo: !orig };
+  document.getElementById('modal-med-titulo').textContent = orig ? 'Editar remédio' : 'Novo remédio';
+  renderEditorMed();
+  document.getElementById('modal-med').classList.add('aberto');
+}
+
+function fecharEditorMed() {
+  document.getElementById('modal-med').classList.remove('aberto');
+  _edit = null;
+}
+
+function renderEditorMed() {
+  const m = _edit.med;
+  const opTipo = Object.entries(TIPOS_MED).map(([v, t]) => `<option value="${v}" ${m.tipo === v ? 'selected' : ''}>${t}</option>`).join('');
+  const regrasHTML = (m.regras || []).map((r, i) => renderRegra(r, i)).join('')
+    || '<p class="dica">Sem horários: o remédio aparece na lista, mas não na agenda.</p>';
+  document.getElementById('modal-med-corpo').innerHTML = `
+    <div class="form-campo"><label>Nome *</label><input type="text" id="ed-nome" value="${esc(m.nome)}" placeholder="Ex.: Apoquel 3,6mg"></div>
+    <div class="form-linha">
+      <div class="form-campo"><label>Tipo</label><select id="ed-tipo">${opTipo}</select></div>
+      <div class="form-campo"><label>Etiqueta (opcional)</label><input type="text" id="ed-label" value="${esc(m.tipoLabel)}" placeholder="Ex.: Oral · antipulgas"></div>
+    </div>
+    <div class="form-linha">
+      <div class="form-campo"><label>Dosagem</label><input type="text" id="ed-dosagem" value="${esc(m.dosagem)}" placeholder="Ex.: ½ comprimido"></div>
+      <div class="form-campo"><label>Via</label><input type="text" id="ed-via" value="${esc(m.via)}" placeholder="Ex.: Oral"></div>
+    </div>
+    <div class="form-campo"><label>Frequência (texto que aparece no cartão)</label><input type="text" id="ed-freq" value="${esc(m.frequencia)}" placeholder="Ex.: A cada 12h, uso contínuo"></div>
+    <div class="form-campo"><label>Instruções</label><textarea id="ed-inst" rows="3">${esc(m.instrucao)}</textarea></div>
+    <div class="form-linha">
+      <div class="form-campo"><label>Valor (opcional)</label><input type="text" id="ed-valor" value="${esc(m.valor)}"></div>
+      <div class="form-campo" style="display:flex; align-items:flex-end;">
+        <label style="display:flex; gap:0.4rem; align-items:center; color:var(--texto); font-size:0.9rem;">
+          <input type="checkbox" id="ed-pausado" ${m.ativo === false ? 'checked' : ''}> Pausado (some da agenda)
+        </label>
+      </div>
+    </div>
+
+    <div class="ajuste-titulo" style="margin-top:0.75rem;">Quando dar</div>
+    ${!_edit.novo ? `<p class="dica">Vai mudar horário ou frequência? Use <strong>“Mudar a partir de hoje”</strong> para não bagunçar as doses que já foram marcadas no passado.</p>` : ''}
+    <div id="ed-regras">${regrasHTML}</div>
+    <div style="display:flex; gap:0.5rem; flex-wrap:wrap;">
+      <button class="btn sec pequeno" onclick="addRegra()">+ Adicionar regra</button>
+      ${!_edit.novo ? '<button class="btn sec pequeno" onclick="mudarAPartirDeHoje()">📅 Mudar a partir de hoje</button>' : ''}
+    </div>
+  `;
+}
+
+function renderRegra(r, i) {
+  const sel = (v, t) => `<option value="${v}" ${r.tipo === v ? 'selected' : ''}>${t}</option>`;
+  let corpo = '';
+  if (r.tipo === 'datas') {
+    const linhas = (r.itens || []).map(it => `${fmtBR(it.data)} ${it.hora}${it.obs ? ' ' + it.obs : ''}`).join('\n');
+    corpo = `<div class="form-campo"><label>Uma dose por linha: dia/mês/ano hora (obs. opcional)</label>
+      <textarea data-r="${i}" data-f="itens" rows="4" placeholder="29/07/2026 15:00">${esc(linhas)}</textarea></div>`;
+  } else {
+    const dias = r.tipo === 'semana' ? `<div class="form-campo"><label>Dias da semana</label><div class="regra-dias">
+      ${DIAS_SEMANA_CURTO.map((d, n) => `<label><input type="checkbox" data-r="${i}" data-f="dia" value="${n}" ${(r.dias || []).includes(n) ? 'checked' : ''}>${d}</label>`).join('')}
+      </div></div>` : '';
+    corpo = `
+      <div class="form-linha">
+        <div class="form-campo"><label>Começa em</label><input type="date" data-r="${i}" data-f="inicio" value="${esc(r.inicio || '')}"></div>
+        <div class="form-campo"><label>Termina em (vazio = contínuo)</label><input type="date" data-r="${i}" data-f="fim" value="${esc(r.fim || '')}"></div>
+      </div>
+      <div class="form-linha">
+        ${r.tipo === 'intervalo' ? `<div class="form-campo"><label>A cada quantos dias</label><input type="number" min="1" data-r="${i}" data-f="cadaDias" value="${esc(r.cadaDias || 1)}"></div>` : ''}
+        <div class="form-campo"><label>Horários (separados por vírgula)</label><input type="text" data-r="${i}" data-f="horas" value="${esc((r.horas || []).join(', '))}" placeholder="10:00, 22:00"></div>
+      </div>
+      ${dias}`;
+  }
+  return `<div class="regra">
+    <div class="form-linha" style="align-items:flex-end;">
+      <div class="form-campo"><label>Tipo de regra</label>
+        <select data-r="${i}" data-f="tipo" onchange="trocarTipoRegra(${i}, this.value)">
+          ${sel('intervalo', 'A cada X dias')}${sel('semana', 'Dias da semana')}${sel('datas', 'Datas específicas')}
+        </select></div>
+      <div class="form-campo" style="flex:0 0 auto;"><button class="btn sec pequeno" onclick="removerRegra(${i})">Remover regra</button></div>
+    </div>
+    ${corpo}
+  </div>`;
+}
+
+function parseHoras(txt) {
+  const out = [];
+  for (const p of String(txt || '').split(/[,;\s]+/).filter(Boolean)) {
+    const mm = p.match(/^(\d{1,2})[:h](\d{2})$/);
+    if (!mm || +mm[1] > 23 || +mm[2] > 59) throw new Error(`Horário inválido: "${p}". Use o formato 22:00.`);
+    out.push(mm[1].padStart(2, '0') + ':' + mm[2]);
+  }
+  return [...new Set(out)].sort();
+}
+
+function parseDatas(txt) {
+  const itens = [];
+  for (const linha of String(txt || '').split('\n').map(l => l.trim()).filter(Boolean)) {
+    const mm = linha.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})\s+(\d{1,2})[:h](\d{2})\s*(.*)$/);
+    if (!mm) throw new Error(`Linha inválida: "${linha}". Use: 29/07/2026 15:00`);
+    itens.push({ data: `${mm[3]}-${mm[2].padStart(2, '0')}-${mm[1].padStart(2, '0')}`,
+                 hora: `${mm[4].padStart(2, '0')}:${mm[5]}`, ...(mm[6] ? { obs: mm[6] } : {}) });
+  }
+  return itens;
+}
+
+// Lê o formulário para _edit.med. estrito=true valida tudo (na hora de salvar).
+function lerEditorMed(estrito) {
+  const m = _edit.med;
+  const v = id => document.getElementById(id).value.trim();
+  m.nome = v('ed-nome'); m.tipo = v('ed-tipo'); m.tipoLabel = v('ed-label');
+  m.dosagem = v('ed-dosagem'); m.via = v('ed-via'); m.frequencia = v('ed-freq');
+  m.instrucao = v('ed-inst'); m.valor = v('ed-valor');
+  m.ativo = !document.getElementById('ed-pausado').checked;
+  const corpo = document.getElementById('modal-med-corpo');
+  (m.regras || []).forEach((r, i) => {
+    const campo = f => corpo.querySelector(`[data-r="${i}"][data-f="${f}"]`);
+    try {
+      if (r.tipo === 'datas') {
+        r.itens = parseDatas(campo('itens').value);
+        if (estrito && !r.itens.length) throw new Error('Uma regra de datas está vazia.');
+        return;
+      }
+      r.inicio = campo('inicio').value;
+      r.fim = campo('fim').value || undefined;
+      if (!r.fim) delete r.fim;
+      r.horas = parseHoras(campo('horas').value);
+      if (r.tipo === 'intervalo') r.cadaDias = Math.max(1, parseInt(campo('cadaDias').value, 10) || 1);
+      if (r.tipo === 'semana') r.dias = [...corpo.querySelectorAll(`[data-r="${i}"][data-f="dia"]:checked`)].map(x => +x.value);
+      if (estrito) {
+        if (!r.inicio) throw new Error('Informe a data de início de cada regra.');
+        if (!r.horas.length) throw new Error('Informe pelo menos um horário em cada regra.');
+        if (r.tipo === 'semana' && !r.dias.length) throw new Error('Marque pelo menos um dia da semana.');
+        if (r.fim && r.fim < r.inicio) throw new Error('A data de término está antes do início.');
+      }
+    } catch (e) { if (estrito) throw e; }
+  });
+}
+
+function addRegra() {
+  lerEditorMed(false);
+  _edit.med.regras = _edit.med.regras || [];
+  _edit.med.regras.push({ tipo: 'intervalo', inicio: hojeISO(), cadaDias: 1, horas: ['09:00'] });
+  renderEditorMed();
+}
+
+function removerRegra(i) {
+  lerEditorMed(false);
+  _edit.med.regras.splice(i, 1);
+  renderEditorMed();
+}
+
+function trocarTipoRegra(i, tipo) {
+  lerEditorMed(false);
+  const r = _edit.med.regras[i];
+  if (tipo === 'datas') _edit.med.regras[i] = { tipo: 'datas', itens: [] };
+  else _edit.med.regras[i] = { tipo, inicio: r.inicio || hojeISO(), ...(r.fim ? { fim: r.fim } : {}),
+    horas: r.horas && r.horas.length ? r.horas : ['09:00'], ...(tipo === 'intervalo' ? { cadaDias: r.cadaDias || 1 } : { dias: r.dias || [] }) };
+  renderEditorMed();
+}
+
+// Encerra as regras abertas ontem e cria cópias começando hoje, para editar
+function mudarAPartirDeHoje() {
+  lerEditorMed(false);
+  const hoje = hojeISO(), ontem = addDias(hoje, -1);
+  const novas = [];
+  for (const r of _edit.med.regras) {
+    if (r.tipo === 'datas' || (r.fim && r.fim < hoje)) continue;
+    if (r.inicio >= hoje) continue;            // já começa hoje ou depois: edita direto
+    const copia = JSON.parse(JSON.stringify(r));
+    copia.inicio = hoje;
+    r.fim = ontem;
+    novas.push(copia);
+  }
+  if (!novas.length) { toast('Nada para dividir — edite as regras direto'); return; }
+  _edit.med.regras.push(...novas);
+  renderEditorMed();
+  toast('Pronto: edite as regras novas (começando hoje)');
+}
+
+function salvarEditorMed() {
+  try {
+    lerEditorMed(true);
+  } catch (e) { alert(e.message); return; }
+  const m = _edit.med;
+  if (!m.nome) { alert('Informe o nome do remédio.'); return; }
+  m.atualizado = new Date().toISOString();
+  if (_edit.novo) {
+    const base = m.nome.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 24) || 'remedio';
+    m.id = base + '-' + Math.random().toString(36).slice(2, 6);
+    m.ordem = Math.max(0, ...estado.meds.map(x => x.ordem || 0)) + 1;
+    estado.meds.push(m);
+  } else {
+    const i = estado.meds.findIndex(x => x.id === m.id);
+    if (i >= 0) estado.meds[i] = m; else estado.meds.push(m);
+  }
+  fecharEditorMed();
+  aposMudarMeds('✓ Remédio salvo');
+}
+
+function encerrarMed(medId) {
+  const m = estado.meds.find(x => x.id === medId);
+  if (!m) return;
+  const hoje = hojeISO();
+  const abertas = (m.regras || []).filter(r => r.tipo !== 'datas' && (!r.fim || r.fim > hoje));
+  if (!abertas.length) { toast('Este remédio já não tem doses depois de hoje'); return; }
+  if (!confirm(`Encerrar "${m.nome}" hoje? As doses de amanhã em diante deixam de aparecer. O histórico fica guardado.`)) return;
+  abertas.forEach(r => { r.fim = hoje; });
+  m.atualizado = new Date().toISOString();
+  aposMudarMeds('Tratamento encerrado');
+}
+
+function excluirMed(medId) {
+  const m = estado.meds.find(x => x.id === medId);
+  if (!m) return;
+  if (!confirm(`Excluir "${m.nome}" da lista? Ele some da agenda e da lista (o histórico continua). Se só parou o tratamento, prefira "Encerrar hoje".`)) return;
+  m.removido = true;
+  m.atualizado = new Date().toISOString();
+  aposMudarMeds('Remédio excluído');
+}
+
+function aposMudarMeds(msg) {
+  salvar();
+  renderTudo();
+  toast(msg);
+  try {
+    if (estado.notif.ativo && 'Notification' in window && Notification.permission === 'granted') reagendarTodas();
+  } catch (e) {}
+}
+
 /* =========================================================
    INICIAR
    ========================================================= */
 function renderTudo() {
+  prepararMeds();
   renderHoje();
   renderSemana();
   renderMeds();
   renderBanhos();
   renderNotas();
   renderHistorico();
+  renderAjustes();
   atualizarListaAgendadas();
 }
 renderTudo();
+enviarFilaAvisos();
 aplicarConfigNotif();
 registrarSW().then(() => {
   // Reagenda ao abrir (para PWAs abertas depois de dias)
