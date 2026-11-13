@@ -1,11 +1,12 @@
-# Cuidados do Freddy
+# Cuidados
 
-App PWA para gerenciar remédios, banhos e cuidados do Freddy — Shih Tzu, 14 anos.
-
-Baseado na receita de 28/07/2026 do Dr. Douglas Moreira Teixeira (CRMV-RS 23.179).
+App PWA para gerenciar remédios e cuidados da família: o Freddy (Shih Tzu, 14 anos) e outros pacientes cadastrados no próprio app.
 
 ## Acesso
 
 Abra: <https://danielecesa.github.io/freddy-cuidados/>
 
-App protegido por senha. Instale como PWA no celular para receber lembretes.
+- Protegido por senha. Instale como PWA no celular para receber lembretes.
+- Os dados sincronizam entre celulares pelo Supabase, **criptografados com a senha do app** (AES-GCM). Quem lê a nuvem vê só dados embaralhados.
+- O administrador (PIN próprio) cadastra pacientes e remédios e recebe avisos pelo app **ntfy** quando alguém marca uma dose.
+- Uma rotina do GitHub Actions acessa o Supabase 2x por semana para o projeto gratuito não pausar.

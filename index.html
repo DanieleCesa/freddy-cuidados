@@ -3,12 +3,12 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Cuidados do Freddy</title>
+<title>Cuidados</title>
 <link rel="manifest" href="freddy-manifest.webmanifest">
 <meta name="theme-color" content="#4a7a3a">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
-<meta name="apple-mobile-web-app-title" content="Freddy">
+<meta name="apple-mobile-web-app-title" content="Cuidados">
 <link rel="apple-touch-icon" href="assets/icon-freddy.svg">
 <link rel="icon" type="image/svg+xml" href="assets/icon-freddy.svg">
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -795,6 +795,14 @@
   .dica { font-size:0.8rem; color:var(--texto-fraco); margin:0.25rem 0 0.5rem; }
   .ntfy-topico { font-family:monospace; font-size:1rem; background:var(--verde-suave); padding:0.4rem 0.6rem; border-radius:6px;
     word-break:break-all; display:inline-block; }
+  .barra-pacientes { display:flex; gap:0.5rem; padding:0.6rem 2rem; overflow-x:auto; background:var(--bege-card);
+    border-bottom:1px solid var(--border-suave); }
+  .barra-pacientes button { flex:0 0 auto; border:1px solid var(--border); background:#fff; color:var(--texto);
+    padding:0.35rem 0.85rem; border-radius:999px; font-family:inherit; font-size:0.9rem; cursor:pointer; }
+  .barra-pacientes button.ativo { background:var(--verde); border-color:var(--verde); color:#fff; }
+  .barra-pacientes button.add { border-style:dashed; color:var(--texto-sec); }
+  @media (max-width: 600px) { .barra-pacientes { padding:0.6rem 1rem; } }
+  .tag-pac { background: var(--verde-suave); color: var(--verde-escuro); }
   .ajuste-titulo { font-family:'Cormorant Garamond',serif; font-size:1.25rem; color:var(--verde-escuro); margin-bottom:0.5rem; }
 </style>
 </head>
@@ -803,7 +811,7 @@
 <div id="lock">
   <div class="box">
     <div class="emoji">🐶🔒</div>
-    <h1>Cuidados do Freddy</h1>
+    <h1>Cuidados</h1>
     <div class="sub">Digite a senha para continuar</div>
     <form id="lock-form" autocomplete="off">
       <input type="password" id="lock-input" inputmode="numeric" placeholder="senha" autofocus>
@@ -817,6 +825,26 @@
 (function(){
   const SENHA_HASH = '12d9634a066ef75f5c94fc8b7cc77250f4fbf254b79fe7252e36dc22d0b6d40c';
   const UNLOCK_KEY = 'freddy-unlocked-v1';
+  const CHAVE_KEY = 'cuidados-chave-v1';
+  // A chave que embaralha os dados na nuvem é derivada da senha do app.
+  window._chavePronta = new Promise(r => { window._resolverChave = r; });
+
+  async function derivarChave(senha) {
+    const base = await crypto.subtle.importKey('raw', new TextEncoder().encode(senha), 'PBKDF2', false, ['deriveKey']);
+    return crypto.subtle.deriveKey(
+      { name: 'PBKDF2', salt: new TextEncoder().encode('freddy-cuidados-cripto-v1'), iterations: 310000, hash: 'SHA-256' },
+      base, { name: 'AES-GCM', length: 256 }, true, ['encrypt', 'decrypt']);
+  }
+  async function guardarChave(k) {
+    const raw = new Uint8Array(await crypto.subtle.exportKey('raw', k));
+    localStorage.setItem(CHAVE_KEY, btoa(String.fromCharCode(...raw)));
+  }
+  async function carregarChave() {
+    const b = localStorage.getItem(CHAVE_KEY);
+    if (!b) return null;
+    const raw = Uint8Array.from(atob(b), c => c.charCodeAt(0));
+    return crypto.subtle.importKey('raw', raw, { name: 'AES-GCM' }, false, ['encrypt', 'decrypt']);
+  }
 
   async function sha256(s) {
     const enc = new TextEncoder().encode(s);
@@ -831,11 +859,18 @@
     try { localStorage.setItem(UNLOCK_KEY, '1'); } catch(e){}
   }
 
-  // Já destravou antes neste aparelho?
+  // Já destravou antes neste aparelho (e já tem a chave)?
+  let pedirDeNovo = false;
   try {
     if (localStorage.getItem(UNLOCK_KEY) === '1') {
-      destravar();
-      return;
+      if (localStorage.getItem(CHAVE_KEY)) {
+        destravar();
+        carregarChave().then(k => window._resolverChave(k)).catch(() => {
+          localStorage.removeItem(CHAVE_KEY); localStorage.removeItem(UNLOCK_KEY); location.reload();
+        });
+        return;
+      }
+      pedirDeNovo = true;   // versão antiga: falta a chave — pede a senha uma vez
     }
   } catch(e){}
 
@@ -844,6 +879,10 @@
     const input = document.getElementById('lock-input');
     const erro = document.getElementById('lock-erro');
     if (!form) return;
+    if (pedirDeNovo) {
+      const sub = document.querySelector('#lock .sub');
+      if (sub) sub.textContent = 'Atualização de segurança: digite a senha mais uma vez';
+    }
     setTimeout(() => input && input.focus(), 100);
 
     form.addEventListener('submit', async (e) => {
@@ -853,6 +892,11 @@
       if (!val) return;
       const h = await sha256(val);
       if (h === SENHA_HASH) {
+        try {
+          const k = await derivarChave(val);
+          await guardarChave(k);
+          window._resolverChave(k);
+        } catch (err) { console.warn('chave:', err); }
         destravar();
       } else {
         erro.textContent = 'Senha incorreta';
@@ -866,10 +910,10 @@
 
 <header>
   <div class="marca">
-    <div class="avatar">🐶</div>
+    <div class="avatar" id="cab-avatar">🐶</div>
     <div>
-      <h1>Freddy <span>· cuidados</span></h1>
-      <div class="sub">Shih Tzu · 14 anos · 4,35 kg · macho castrado</div>
+      <h1 id="cab-nome">Freddy <span>· cuidados</span></h1>
+      <div class="sub" id="cab-sub">Shih Tzu · 14 anos · 4,35 kg · macho castrado</div>
     </div>
   </div>
   <div class="header-info">
@@ -881,6 +925,8 @@
     </div>
   </div>
 </header>
+
+<div id="barra-pacientes" class="barra-pacientes"></div>
 
 <nav>
   <button data-aba="hoje" class="ativo">Hoje</button>
@@ -937,18 +983,9 @@
   <!-- MEDICAMENTOS -->
   <section class="aba" id="aba-meds">
     <h2 class="titulo-aba">Medicamentos</h2>
-    <div class="subtitulo-aba">Prescrição de 28/07/2026 — Dr. Douglas Moreira Teixeira</div>
+    <div class="subtitulo-aba" id="meds-receita"></div>
 
-    <div class="vet-card">
-      <div class="rotulo">Veterinário Responsável</div>
-      <div class="nome">Dr. Douglas Moreira Teixeira</div>
-      <div class="detalhes">
-        <span><strong>Especialidade:</strong> Dermatologia Veterinária</span>
-        <span><strong>CRMV-RS:</strong> 23.179</span>
-        <span><strong>Cel:</strong> (51) 99004-9026</span>
-        <span><strong>E-mail:</strong> douglas.teixeu@gmail.com</span>
-      </div>
-    </div>
+    <div id="meds-medico"></div>
 
     <div class="barra-acoes">
       <button class="btn sec" onclick="window.print()">🖨️ Imprimir</button>
@@ -974,7 +1011,7 @@
     <div class="subtitulo-aba">Registre reações, observações, dúvidas para o vet.</div>
 
     <div class="card">
-      <textarea id="nota-nova" class="nota-input" rows="3" placeholder="Ex.: Freddy coçando menos hoje. Ou: pergunta para o Dr. Douglas..."></textarea>
+      <textarea id="nota-nova" class="nota-input" rows="3" placeholder="Ex.: coçando menos hoje. Ou: pergunta para o médico/veterinário..."></textarea>
       <div style="margin-top: 0.5rem;">
         <button class="btn" onclick="adicionarNota()">Adicionar anotação</button>
       </div>
@@ -989,7 +1026,8 @@
 
     <div class="card" id="card-usuario"></div>
     <div class="card" id="card-ntfy"></div>
-    <div class="subtitulo-aba">Configure lembretes automáticos das doses do Freddy no seu celular.</div>
+    <div class="card" id="card-lembrete-pac"></div>
+    <div class="subtitulo-aba">Configure lembretes automáticos das doses no seu celular.</div>
 
     <div class="card destaque">
       <div style="font-family:'Cormorant Garamond',serif; font-size:1.3rem; color:var(--verde-escuro); margin-bottom:0.5rem;">
@@ -1096,6 +1134,18 @@
   </div>
 </div>
 
+<div id="modal-pac" class="modal" onclick="if(event.target===this)fecharEditorPaciente()">
+  <div class="modal-caixa">
+    <h3 id="modal-pac-titulo" class="serif">Paciente</h3>
+    <div id="modal-pac-corpo"></div>
+    <div class="modal-acoes">
+      <button class="btn sec" id="pac-excluir" onclick="excluirPaciente()" style="margin-right:auto;">🗑 Excluir</button>
+      <button class="btn sec" onclick="fecharEditorPaciente()">Cancelar</button>
+      <button class="btn" onclick="salvarEditorPaciente()">Salvar</button>
+    </div>
+  </div>
+</div>
+
 <input type="file" id="foto-input" accept="image/*" capture="environment" style="display:none">
 
 <script>
@@ -1159,6 +1209,17 @@ const MEDS_PADRAO = [
     regras: [{ tipo: 'intervalo', inicio: '2026-08-01', cadaDias: 7, horas: ['18:30'] }] },
 ];
 
+// Pacientes (sincronizados). O Freddy é o primeiro; outros são criados no app.
+const PACIENTES_PADRAO = [
+  { id: 'freddy', ordem: 1, nome: 'Freddy', emoji: '🐶', descricao: 'Shih Tzu · 14 anos · 4,35 kg · macho castrado',
+    receita: 'Prescrição de 28/07/2026 — Dr. Douglas Moreira Teixeira',
+    medicoTitulo: 'Veterinário Responsável', medicoNome: 'Dr. Douglas Moreira Teixeira',
+    medicoDetalhes: 'Especialidade: Dermatologia Veterinária\nCRMV-RS: 23.179\nCel: (51) 99004-9026\nE-mail: douglas.teixeu@gmail.com' },
+];
+function pacientesPadrao() {
+  return PACIENTES_PADRAO.map(p => ({ ...p, atualizado: MEDS_PADRAO_T }));
+}
+
 function medsPadrao() {
   return MEDS_PADRAO.map(m => ({ ...JSON.parse(JSON.stringify(m)), atualizado: MEDS_PADRAO_T }));
 }
@@ -1203,16 +1264,41 @@ function gerarDosesRegras(regras, hojeDate) {
 
 // Lista "viva" usada pelo resto do app (montada a partir de estado.meds)
 let MEDS = [];
+let PACIENTES = [];
 function prepararMeds() {
+  PACIENTES = (estado.pacientes || []).filter(p => p && p.id && !p.removido)
+    .sort((a, b) => (a.ordem || 0) - (b.ordem || 0));
   const lista = (estado.meds || []).filter(m => m && m.id && !m.removido)
     .sort((a, b) => (a.ordem || 0) - (b.ordem || 0));
-  MEDS = lista.map((m, i) => ({
-    ...m,
-    numero: i + 1,
-    tipoLabel: m.tipoLabel || TIPOS_MED[m.tipo] || 'Outro',
-    gerarDoses: (h) => gerarDosesRegras(m.regras, h),
-  }));
+  const contador = {};
+  MEDS = lista.map(m => {
+    const pac = m.paciente || 'freddy';
+    contador[pac] = (contador[pac] || 0) + 1;
+    return {
+      ...m,
+      paciente: pac,
+      numero: contador[pac],
+      tipoLabel: m.tipoLabel || TIPOS_MED[m.tipo] || 'Outro',
+      gerarDoses: (h) => gerarDosesRegras(m.regras, h),
+    };
+  });
 }
+
+function pacientePorId(id) { return PACIENTES.find(p => p.id === (id || 'freddy')); }
+function nomePaciente(id) { const p = pacientePorId(id); return p ? p.nome : '—'; }
+function emojiPaciente(id) { const p = pacientePorId(id); return (p && p.emoji) || '👤'; }
+// Paciente escolhido neste celular: id ou 'todos'
+function pacienteSel() {
+  const s = estado.eu.paciente;
+  if (s && s !== 'todos' && pacientePorId(s)) return s;
+  if (s === 'todos') return 'todos';
+  return PACIENTES.length === 1 ? PACIENTES[0].id : 'todos';
+}
+function visivelPaciente(pid) {
+  const s = pacienteSel();
+  return s === 'todos' || (pid || 'freddy') === s;
+}
+function mostrandoTodos() { return pacienteSel() === 'todos' && PACIENTES.length > 1; }
 
 function esc(s) {
   return String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -1241,8 +1327,9 @@ function normalizarEstado(s) {
   s.historico = s.historico || [];
   s.fotos = s.fotos || {};
   s.semanaOffset = 0;
-  s.notif = { ativo: false, antecMin: 10, repetir: false, ...(s.notif || {}) };
+  s.notif = { ativo: false, antecMin: 10, repetir: false, pacientes: null, ...(s.notif || {}) };
   s.meds = (Array.isArray(s.meds) && s.meds.length) ? s.meds : medsPadrao();
+  s.pacientes = (Array.isArray(s.pacientes) && s.pacientes.length) ? s.pacientes : pacientesPadrao();
   s.config = s.config || {};            // sincronizado: ntfyTopico, adminHash
   s.eu = { nome: '', admin: false, ...(s.eu || {}) };   // só deste celular
   s.filaAvisos = Array.isArray(s.filaAvisos) ? s.filaAvisos : [];
@@ -1285,6 +1372,27 @@ try {
 } catch(e) { console.warn('Supabase não disponível:', e); }
 
 let _pushDebounce = null;
+let _chave = null;          // CryptoKey AES-GCM derivada da senha
+let _criptoErro = false;    // nuvem cifrada com outra senha: não gravar por cima
+
+function paraB64(bytes) {
+  let s = '';
+  for (let i = 0; i < bytes.length; i += 0x8000) s += String.fromCharCode.apply(null, bytes.subarray(i, i + 0x8000));
+  return btoa(s);
+}
+function deB64(b) { return Uint8Array.from(atob(b), c => c.charCodeAt(0)); }
+
+async function cifrar(obj) {
+  const iv = crypto.getRandomValues(new Uint8Array(12));
+  const ct = await crypto.subtle.encrypt({ name: 'AES-GCM', iv }, _chave, new TextEncoder().encode(JSON.stringify(obj)));
+  return { enc: 'aesgcm-v1', iv: paraB64(iv), ct: paraB64(new Uint8Array(ct)) };
+}
+// Devolve o objeto em claro. Dados antigos (sem cifra) passam direto.
+async function decifrar(d) {
+  if (!d || d.enc !== 'aesgcm-v1') return d;
+  const pt = await crypto.subtle.decrypt({ name: 'AES-GCM', iv: deB64(d.iv) }, _chave, deB64(d.ct));
+  return JSON.parse(new TextDecoder().decode(pt));
+}
 let _syncando = false;
 let _ultimaSync = null;
 
@@ -1334,6 +1442,13 @@ function mergeEstado(remoto) {
     if (!a || (m.atualizado || '') >= (a.atualizado || '')) medsMap[m.id] = m;
   }
   const meds = Object.values(medsMap);
+  const pacMap = {};
+  for (const p of [...(remoto.pacientes || []), ...(estado.pacientes || [])]) {
+    if (!p || !p.id) continue;
+    const a = pacMap[p.id];
+    if (!a || (p.atualizado || '') >= (a.atualizado || '')) pacMap[p.id] = p;
+  }
+  const pacientes = Object.values(pacMap);
   // config: o mais recente vence
   const lc = estado.config || {}, rc = remoto.config || {};
   const config = (lc.atualizado || '') >= (rc.atualizado || '') ? lc : rc;
@@ -1343,22 +1458,33 @@ function mergeEstado(remoto) {
   estado.historico = historico;
   estado.fotos = fotos;
   if (meds.length) estado.meds = meds;
+  if (pacientes.length) estado.pacientes = pacientes;
   estado.config = config;
   prepararMeds();
 }
 
 async function pullMerge(silencioso = false) {
-  if (!sb) return;
+  if (!sb || !_chave) return;
   try {
     if (!silencioso) setSyncStatus('☁️ sincronizando…', 'var(--texto-sec)');
     const { data, error } = await sb.from('freddy_estado').select('dados, atualizado_em').eq('id', 1).maybeSingle();
     if (error) throw error;
     if (data && data.dados) {
-      mergeEstado(data.dados);
+      const cifrado = data.dados.enc === 'aesgcm-v1';
+      let dados;
+      try { dados = await decifrar(data.dados); }
+      catch (e) {
+        _criptoErro = true;
+        setSyncStatus('🔑 senha diferente', 'var(--pendente)');
+        console.warn('Não consegui abrir os dados da nuvem (senha diferente?)', e);
+        return;
+      }
+      _criptoErro = false;
+      mergeEstado(dados);
       salvarLocal();
       renderTudo();
-      // Se outro celular com versão antiga apagou remédios/config da nuvem, reenvia
-      if (!data.dados.meds || (!data.dados.config && estado.config.atualizado)) agendarPush();
+      // Nuvem ainda sem cifra, ou celular antigo apagou campos: regrava
+      if (!cifrado || !dados.meds || !dados.pacientes || (!dados.config && estado.config.atualizado)) agendarPush();
     }
     _ultimaSync = new Date();
     setSyncStatus('☁️ sincronizado', 'var(--verde)');
@@ -1369,13 +1495,18 @@ async function pullMerge(silencioso = false) {
 }
 
 async function pushRemote() {
-  if (!sb || _syncando) return;
+  if (!sb || _syncando || !_chave) return;
   _syncando = true;
   try {
     setSyncStatus('☁️ enviando…', 'var(--texto-sec)');
     // Merge com remoto antes de enviar (evita perder alterações do outro celular)
     const { data: atual } = await sb.from('freddy_estado').select('dados').eq('id', 1).maybeSingle();
-    if (atual && atual.dados) mergeEstado(atual.dados);
+    if (atual && atual.dados) {
+      let remoto;
+      try { remoto = await decifrar(atual.dados); _criptoErro = false; }
+      catch (e) { _criptoErro = true; throw new Error('dados da nuvem com outra senha — não vou gravar por cima'); }
+      mergeEstado(remoto);
+    }
 
     const dados = {
       feitas: estado.feitas || {},
@@ -1383,10 +1514,11 @@ async function pushRemote() {
       historico: estado.historico || [],
       fotos: estado.fotos || {},
       meds: estado.meds || [],
+      pacientes: estado.pacientes || [],
       config: estado.config || {},
     };
     const { error } = await sb.from('freddy_estado').upsert({
-      id: 1, dados, atualizado_em: new Date().toISOString()
+      id: 1, dados: await cifrar(dados), atualizado_em: new Date().toISOString()
     });
     if (error) throw error;
     salvarLocal();
@@ -1394,7 +1526,7 @@ async function pushRemote() {
     setSyncStatus('☁️ sincronizado', 'var(--verde)');
   } catch(e) {
     console.warn('push falhou:', e);
-    setSyncStatus('⚠️ sync', 'var(--pendente)');
+    setSyncStatus(_criptoErro ? '🔑 senha diferente' : '⚠️ sync', 'var(--pendente)');
   } finally {
     _syncando = false;
   }
@@ -1452,11 +1584,12 @@ function keyDose(medId, data, hora) {
   return `${medId}|${data}|${hora}`;
 }
 
-function todasDoses(hoje) {
+function todasDoses(hoje, filtroPaciente) {
   const h = new Date(hoje + 'T12:00:00');
   const todas = [];
+  const filtro = filtroPaciente || visivelPaciente;
   for (const m of MEDS) {
-    if (!m.ativo) continue;
+    if (m.ativo === false || !filtro(m.paciente)) continue;
     const doses = m.gerarDoses(h);
     for (const d of doses) {
       todas.push({ ...d, med: m });
@@ -1477,7 +1610,8 @@ function marcarDose(medId, data, hora, feita) {
     med: med.nome,
     dose: `${med.dosagem} · ${data} ${hora}`,
     acao: feita ? 'marcado como dado' : 'desmarcado',
-    quem: estado.eu.nome || ''
+    quem: estado.eu.nome || '',
+    paciente: med.paciente
   });
   estado.historico = estado.historico.slice(0, 200);
   salvar();
@@ -1582,6 +1716,7 @@ function renderDose(dose) {
     ${foto ? `<div class="dose-foto" style="width:42px;height:42px;border-radius:6px;overflow:hidden;flex-shrink:0;cursor:pointer;border:1px solid var(--border-suave);" data-foto="${dose.med.id}"><img src="${foto}" style="width:100%;height:100%;object-fit:cover;" alt=""></div>` : ''}
     <div class="info">
       <div class="nome-med">
+        ${mostrandoTodos() ? `<span class="tag tag-pac">${esc(emojiPaciente(dose.med.paciente))} ${esc(nomePaciente(dose.med.paciente))}</span>` : ''}
         ${esc(dose.med.nome)}
         <span class="tag tag-${esc(dose.med.tipo)}">${esc(dose.med.tipoLabel)}</span>
       </div>
@@ -1640,8 +1775,8 @@ function renderSemana() {
         const feita = isFeita(k);
         const ev = document.createElement('div');
         ev.className = 'dia-evento ' + dose.med.tipo + (feita ? ' feito' : '');
-        ev.innerHTML = `<span class="n">${esc(dose.med.nome.split(' ')[0])}</span><span class="h">${dose.hora}</span>`;
-        ev.title = `${dose.med.nome} · ${dose.med.dosagem}\nClique para ${feita ? 'desmarcar' : 'marcar como dado'}`;
+        ev.innerHTML = `<span class="n">${mostrandoTodos() ? esc(emojiPaciente(dose.med.paciente)) + ' ' : ''}${esc(dose.med.nome.split(' ')[0])}</span><span class="h">${dose.hora}</span>`;
+        ev.title = `${nomePaciente(dose.med.paciente)} · ${dose.med.nome} · ${dose.med.dosagem}\nClique para ${feita ? 'desmarcar' : 'marcar como dado'}`;
         ev.style.cursor = 'pointer';
         ev.addEventListener('click', () => marcarDose(dose.med.id, dose.data, dose.hora, !feita));
         corpo.appendChild(ev);
@@ -1661,13 +1796,34 @@ function renderMeds() {
   const todas = todasDoses(hoje);
   const admin = !!estado.eu.admin;
 
+  const sel = pacienteSel();
+  const pac = sel === 'todos' ? null : pacientePorId(sel);
+  document.getElementById('meds-receita').textContent = pac ? (pac.receita || '') : 'Todos os pacientes';
+  const medico = document.getElementById('meds-medico');
+  medico.innerHTML = pac && (pac.medicoNome || pac.medicoDetalhes) ? `
+    <div class="vet-card">
+      <div class="rotulo">${esc(pac.medicoTitulo || 'Médico responsável')}</div>
+      <div class="nome">${esc(pac.medicoNome || '')}</div>
+      <div class="detalhes">${String(pac.medicoDetalhes || '').split('\n').filter(Boolean).map(l => {
+        const i = l.indexOf(':');
+        return i > 0 ? `<span><strong>${esc(l.slice(0, i + 1))}</strong>${esc(l.slice(i + 1))}</span>` : `<span>${esc(l)}</span>`;
+      }).join('')}</div>
+    </div>` : '';
+
   const barra = document.getElementById('meds-admin');
   barra.innerHTML = admin
     ? `<div class="admin-barra"><span>👑 Modo administrador — você pode alterar os remédios.</span>
-         <button class="btn" onclick="abrirEditorMed()">+ Novo remédio</button></div>`
+         <span style="display:flex; gap:0.4rem; flex-wrap:wrap;">
+           ${pac ? `<button class="btn sec" onclick="abrirEditorPaciente('${pac.id}')">✏️ Editar ${esc(pac.nome)}</button>` : ''}
+           <button class="btn" onclick="abrirEditorMed()">+ Novo remédio</button>
+         </span></div>`
     : '';
+  if (!MEDS.some(m => visivelPaciente(m.paciente))) {
+    cont.innerHTML = `<div class="card vazio">Nenhum remédio cadastrado${pac ? ' para ' + esc(pac.nome) : ''}.${admin ? ' Toque em “+ Novo remédio”.' : ''}</div>`;
+  }
 
   for (const m of MEDS) {
+    if (!visivelPaciente(m.paciente)) continue;
     const doses = todas.filter(x => x.med.id === m.id);
     const feitas = doses.filter(x => isFeita(keyDose(x.med.id, x.data, x.hora))).length;
     const total = doses.length;
@@ -1682,6 +1838,7 @@ function renderMeds() {
       <div class="med-cabecalho">
         <div class="med-nome">
           <span class="num">${m.numero}</span>
+          ${mostrandoTodos() ? `<span class="tag tag-pac">${esc(emojiPaciente(m.paciente))} ${esc(nomePaciente(m.paciente))}</span>` : ''}
           ${esc(m.nome)}
           <span class="tag tag-${esc(m.tipo)}">${esc(m.tipoLabel)}</span>
           ${m.ativo === false ? '<span class="tag tag-pausado">Pausado</span>' : ''}
@@ -1930,7 +2087,8 @@ function adicionarNota() {
   const t = document.getElementById('nota-nova');
   const txt = t.value.trim();
   if (!txt) return;
-  estado.notas.unshift({ quando: new Date().toISOString(), texto: txt });
+  const sel = pacienteSel();
+  estado.notas.unshift({ quando: new Date().toISOString(), texto: txt, paciente: sel === 'todos' ? 'geral' : sel, quem: estado.eu.nome || '' });
   t.value = '';
   salvar();
   renderNotas();
@@ -1945,17 +2103,20 @@ function apagarNota(i) {
 function renderNotas() {
   const cont = document.getElementById('notas-lista');
   cont.innerHTML = '';
-  if (estado.notas.length === 0) {
+  const visivel = n => { const p = n.paciente || 'freddy'; return p === 'geral' || visivelPaciente(p); };
+  if (!estado.notas.some(visivel)) {
     cont.innerHTML = '<div class="card vazio">Nenhuma anotação ainda.</div>';
     return;
   }
   estado.notas.forEach((n, i) => {
+    if (!visivel(n)) return;
+    const p = n.paciente || 'freddy';
     const el = document.createElement('div');
     el.className = 'nota';
     const d = new Date(n.quando);
     el.innerHTML = `
       <button class="apagar" onclick="apagarNota(${i})">apagar</button>
-      <div class="quando">${d.toLocaleString('pt-BR')}</div>
+      <div class="quando">${d.toLocaleString('pt-BR')}${mostrandoTodos() ? ' · ' + (p === 'geral' ? 'geral' : esc(emojiPaciente(p) + ' ' + nomePaciente(p))) : ''}${n.quem ? ' · ' + esc(n.quem) : ''}</div>
       <div class="texto"></div>
     `;
     el.querySelector('.texto').textContent = n.texto;
@@ -1969,17 +2130,18 @@ function renderNotas() {
 function renderHistorico() {
   const cont = document.getElementById('historico-lista');
   cont.innerHTML = '';
-  if (estado.historico.length === 0) {
+  const lista = estado.historico.filter(h => visivelPaciente(h.paciente || 'freddy'));
+  if (lista.length === 0) {
     cont.innerHTML = '<div class="vazio">Sem registros ainda.</div>';
     return;
   }
-  for (const h of estado.historico) {
+  for (const h of lista) {
     const d = new Date(h.quando);
     const el = document.createElement('div');
     el.className = 'hist-item';
     el.innerHTML = `
       <div class="quando">${d.toLocaleString('pt-BR', {day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'})}</div>
-      <div class="o-que"><strong>${esc(h.med)}</strong> — ${esc(h.dose)}</div>
+      <div class="o-que">${mostrandoTodos() ? esc(emojiPaciente(h.paciente) + ' ' + nomePaciente(h.paciente)) + ' · ' : ''}<strong>${esc(h.med)}</strong> — ${esc(h.dose)}</div>
       <div class="acao">${esc(h.acao)}${h.quem ? ' · por ' + esc(h.quem) : ''}</div>
     `;
     cont.appendChild(el);
@@ -2046,7 +2208,7 @@ document.getElementById('sem-ant').addEventListener('click', () => { estado.sema
 document.getElementById('sem-prox').addEventListener('click', () => { estado.semanaOffset++; renderSemana(); });
 document.getElementById('btn-trancar').addEventListener('click', (e) => {
   e.preventDefault();
-  try { localStorage.removeItem('freddy-unlocked-v1'); } catch(err){}
+  try { localStorage.removeItem('freddy-unlocked-v1'); localStorage.removeItem('cuidados-chave-v1'); } catch(err){}
   location.reload();
 });
 document.getElementById('btn-sync').addEventListener('click', async (e) => {
@@ -2135,7 +2297,8 @@ function proximasDoses(horizonteHoras = 72) {
   const agora = new Date();
   const limite = new Date(agora.getTime() + horizonteHoras * 3600_000);
   const hoje = hojeISO();
-  const doses = todasDoses(hoje);
+  const lista = estado.notif.pacientes;   // null = todos
+  const doses = todasDoses(hoje, pid => !Array.isArray(lista) || lista.includes(pid));
   return doses
     .map(d => ({ ...d, quando: new Date(d.data + 'T' + d.hora + ':00') }))
     .filter(d => d.quando > agora && d.quando <= limite)
@@ -2174,7 +2337,7 @@ async function reagendarTodas() {
     if (disparo <= new Date()) continue;
     if (agendadas >= 40) break; // limite de segurança
 
-    const titulo = `Freddy · ${d.med.nome}`;
+    const titulo = `${nomePaciente(d.med.paciente)} · ${d.med.nome}`;
     const corpo = `${d.med.dosagem} · ${d.med.via} · ${d.hora}${
       estado.notif.antecMin > 0 ? ` (em ${estado.notif.antecMin} min)` : ''}`;
     const opcoes = {
@@ -2270,8 +2433,8 @@ async function testarNotif() {
     icon: 'assets/icon-freddy.svg',
     badge: 'assets/icon-freddy.svg'
   };
-  if (swReg) await swReg.showNotification('Freddy · teste', opts);
-  else new Notification('Freddy · teste', opts);
+  if (swReg) await swReg.showNotification('Cuidados · teste', opts);
+  else new Notification('Cuidados · teste', opts);
 }
 
 async function limparAgendadas() {
@@ -2388,7 +2551,7 @@ function renderAjustes() {
       ${topico ? `
         <p style="font-size:0.9rem; color:var(--texto-sec); margin-bottom:0.5rem;">
           Quando outra pessoa marcar uma dose, chega um aviso no seu celular pelo app gratuito <strong>ntfy</strong>,
-          mesmo com o Freddy Cuidados fechado.
+          mesmo com o app fechado.
         </p>
         <ol style="font-size:0.9rem; color:var(--texto-sec); padding-left:1.2rem; margin-bottom:0.75rem;">
           <li>Instale o app <strong>ntfy</strong> (Play Store ou App Store).</li>
@@ -2454,7 +2617,7 @@ async function testarAviso() {
   const topic = estado.config.ntfyTopico;
   if (!topic) return;
   try {
-    const r = await publicarNtfy({ topic, title: '🐶 Teste — Freddy Cuidados', message: 'Se você está vendo isto, os avisos estão funcionando!', tags: ['dog'] });
+    const r = await publicarNtfy({ topic, title: '💊 Teste — Cuidados', message: 'Se você está vendo isto, os avisos estão funcionando!', tags: ['pill'] });
     toast(r.ok ? '✓ Aviso de teste enviado' : 'Falhou (' + r.status + ')');
   } catch (e) {
     toast('Sem internet para enviar o teste');
@@ -2468,9 +2631,9 @@ function avisarAdmin(med, data, hora, feita) {
   const agora = new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
   estado.filaAvisos.push({
     topic,
-    title: feita ? `✅ ${med.nome} — dado` : `↩️ ${med.nome} — desmarcado`,
+    title: `${feita ? '✅' : '↩️'} ${nomePaciente(med.paciente)} · ${med.nome} — ${feita ? 'dado' : 'desmarcado'}`,
     message: `${quem} ${feita ? 'marcou como dado' : 'desmarcou'}: ${med.dosagem}, dose de ${fmtBR(data).slice(0, 5)} às ${hora}. (registrado às ${agora})`,
-    tags: ['dog'],
+    tags: ['pill'],
   });
   estado.filaAvisos = estado.filaAvisos.slice(-30);
   salvarLocal();
@@ -2504,7 +2667,7 @@ function abrirEditorMed(medId) {
   if (!estado.eu.admin) return;
   const orig = medId ? estado.meds.find(m => m.id === medId) : null;
   const med = orig ? JSON.parse(JSON.stringify(orig)) : {
-    id: '', nome: '', tipo: 'oral', tipoLabel: '', dosagem: '', via: 'Oral', frequencia: '', valor: '', instrucao: '', ativo: true,
+    id: '', paciente: pacienteSel() !== 'todos' ? pacienteSel() : (PACIENTES[0] || {}).id, nome: '', tipo: 'oral', tipoLabel: '', dosagem: '', via: 'Oral', frequencia: '', valor: '', instrucao: '', ativo: true,
     regras: [{ tipo: 'intervalo', inicio: hojeISO(), cadaDias: 1, horas: ['09:00'] }],
   };
   _edit = { med, novo: !orig };
@@ -2523,7 +2686,9 @@ function renderEditorMed() {
   const opTipo = Object.entries(TIPOS_MED).map(([v, t]) => `<option value="${v}" ${m.tipo === v ? 'selected' : ''}>${t}</option>`).join('');
   const regrasHTML = (m.regras || []).map((r, i) => renderRegra(r, i)).join('')
     || '<p class="dica">Sem horários: o remédio aparece na lista, mas não na agenda.</p>';
+  const opPac = PACIENTES.map(p => `<option value="${esc(p.id)}" ${(m.paciente || 'freddy') === p.id ? 'selected' : ''}>${esc(p.emoji || '')} ${esc(p.nome)}</option>`).join('');
   document.getElementById('modal-med-corpo').innerHTML = `
+    <div class="form-campo"><label>Paciente</label><select id="ed-paciente">${opPac}</select></div>
     <div class="form-campo"><label>Nome *</label><input type="text" id="ed-nome" value="${esc(m.nome)}" placeholder="Ex.: Apoquel 3,6mg"></div>
     <div class="form-linha">
       <div class="form-campo"><label>Tipo</label><select id="ed-tipo">${opTipo}</select></div>
@@ -2613,7 +2778,7 @@ function parseDatas(txt) {
 function lerEditorMed(estrito) {
   const m = _edit.med;
   const v = id => document.getElementById(id).value.trim();
-  m.nome = v('ed-nome'); m.tipo = v('ed-tipo'); m.tipoLabel = v('ed-label');
+  m.paciente = v('ed-paciente'); m.nome = v('ed-nome'); m.tipo = v('ed-tipo'); m.tipoLabel = v('ed-label');
   m.dosagem = v('ed-dosagem'); m.via = v('ed-via'); m.frequencia = v('ed-freq');
   m.instrucao = v('ed-inst'); m.valor = v('ed-valor');
   m.ativo = !document.getElementById('ed-pausado').checked;
@@ -2733,11 +2898,141 @@ function aposMudarMeds(msg) {
   } catch (e) {}
 }
 
+
+/* =========================================================
+   PACIENTES
+   ========================================================= */
+function escolherPaciente(id) {
+  estado.eu.paciente = id;
+  salvarLocal();
+  renderTudo();
+}
+
+function renderPacientes() {
+  const sel = pacienteSel();
+  const barra = document.getElementById('barra-pacientes');
+  const admin = !!estado.eu.admin;
+  const botoes = PACIENTES.map(p =>
+    `<button class="${sel === p.id ? 'ativo' : ''}" onclick="escolherPaciente('${esc(p.id)}')">${esc(p.emoji || '👤')} ${esc(p.nome)}</button>`);
+  if (PACIENTES.length > 1) botoes.push(`<button class="${sel === 'todos' ? 'ativo' : ''}" onclick="escolherPaciente('todos')">👥 Todos</button>`);
+  if (admin) botoes.push(`<button class="add" onclick="abrirEditorPaciente()">+ Paciente</button>`);
+  barra.innerHTML = botoes.join('');
+  barra.style.display = (PACIENTES.length > 1 || admin) ? '' : 'none';
+
+  // Cabeçalho
+  const p = sel === 'todos' ? null : pacientePorId(sel);
+  document.getElementById('cab-avatar').textContent = p ? (p.emoji || '👤') : '👥';
+  document.getElementById('cab-nome').innerHTML = p ? `${esc(p.nome)} <span>· cuidados</span>` : `Cuidados <span>· todos</span>`;
+  document.getElementById('cab-sub').textContent = p ? (p.descricao || '') : PACIENTES.map(x => x.nome).join(' · ');
+
+  // A aba Banhos é o roteiro do Freddy
+  const btnBanhos = document.querySelector('nav [data-aba="banhos"]');
+  const mostraBanhos = sel === 'freddy';
+  btnBanhos.style.display = mostraBanhos ? '' : 'none';
+  if (!mostraBanhos && btnBanhos.classList.contains('ativo')) document.querySelector('nav [data-aba="hoje"]').click();
+}
+
+let _editPac = null;
+const EMOJIS_PAC = ['👤', '👩', '👨', '👵', '👴', '🧒', '🐶', '🐱', '❤️', '🌻'];
+
+function abrirEditorPaciente(id) {
+  if (!estado.eu.admin) return;
+  const orig = id ? estado.pacientes.find(p => p.id === id) : null;
+  _editPac = { pac: orig ? { ...orig } : { id: '', nome: '', emoji: '👤', descricao: '', receita: '', medicoTitulo: 'Médico responsável', medicoNome: '', medicoDetalhes: '' }, novo: !orig };
+  const p = _editPac.pac;
+  document.getElementById('modal-pac-titulo').textContent = orig ? 'Editar paciente' : 'Novo paciente';
+  document.getElementById('pac-excluir').style.display = orig ? '' : 'none';
+  document.getElementById('modal-pac-corpo').innerHTML = `
+    <div class="form-linha">
+      <div class="form-campo" style="flex:2 1 200px;"><label>Nome *</label><input type="text" id="pac-nome" value="${esc(p.nome)}" placeholder="Ex.: Lauri"></div>
+      <div class="form-campo" style="flex:1 1 100px;"><label>Ícone</label><select id="pac-emoji">
+        ${[...new Set([p.emoji || '👤', ...EMOJIS_PAC])].map(e => `<option ${e === p.emoji ? 'selected' : ''}>${e}</option>`).join('')}
+      </select></div>
+    </div>
+    <div class="form-campo"><label>Descrição (aparece no topo)</label><input type="text" id="pac-desc" value="${esc(p.descricao)}" placeholder="Ex.: 72 anos · pressão alta"></div>
+    <div class="form-campo"><label>Receita / observação (aparece em Medicamentos)</label><input type="text" id="pac-receita" value="${esc(p.receita)}" placeholder="Ex.: Receita de 10/11/2026 — Dra. Ana"></div>
+    <div class="form-linha">
+      <div class="form-campo"><label>Título</label><input type="text" id="pac-mtit" value="${esc(p.medicoTitulo)}" placeholder="Médico responsável"></div>
+      <div class="form-campo"><label>Nome do médico</label><input type="text" id="pac-mnome" value="${esc(p.medicoNome)}"></div>
+    </div>
+    <div class="form-campo"><label>Contatos do médico (um por linha, ex.: “Cel: (51) 9999-9999”)</label><textarea id="pac-mdet" rows="3">${esc(p.medicoDetalhes)}</textarea></div>
+  `;
+  document.getElementById('modal-pac').classList.add('aberto');
+}
+
+function fecharEditorPaciente() {
+  document.getElementById('modal-pac').classList.remove('aberto');
+  _editPac = null;
+}
+
+function salvarEditorPaciente() {
+  const p = _editPac.pac;
+  const v = id => document.getElementById(id).value.trim();
+  p.nome = v('pac-nome'); p.emoji = v('pac-emoji'); p.descricao = v('pac-desc'); p.receita = v('pac-receita');
+  p.medicoTitulo = v('pac-mtit'); p.medicoNome = v('pac-mnome'); p.medicoDetalhes = document.getElementById('pac-mdet').value.trim();
+  if (!p.nome) { alert('Informe o nome do paciente.'); return; }
+  p.atualizado = new Date().toISOString();
+  if (_editPac.novo) {
+    const base = p.nome.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 20) || 'paciente';
+    p.id = base + '-' + Math.random().toString(36).slice(2, 6);
+    p.ordem = Math.max(0, ...estado.pacientes.map(x => x.ordem || 0)) + 1;
+    estado.pacientes.push(p);
+    estado.eu.paciente = p.id;
+  } else {
+    const i = estado.pacientes.findIndex(x => x.id === p.id);
+    if (i >= 0) estado.pacientes[i] = p;
+  }
+  fecharEditorPaciente();
+  salvar();
+  renderTudo();
+  toast('✓ Paciente salvo');
+}
+
+function excluirPaciente() {
+  const p = _editPac && _editPac.pac;
+  if (!p || _editPac.novo) return;
+  const temMeds = (estado.meds || []).some(m => !m.removido && (m.paciente || 'freddy') === p.id);
+  if (temMeds) { alert(`Antes de excluir, exclua ou mude de paciente os remédios de ${p.nome}.`); return; }
+  if (!confirm(`Excluir ${p.nome}? O histórico continua guardado.`)) return;
+  const i = estado.pacientes.findIndex(x => x.id === p.id);
+  estado.pacientes[i] = { ...estado.pacientes[i], removido: true, atualizado: new Date().toISOString() };
+  if (estado.eu.paciente === p.id) estado.eu.paciente = '';
+  fecharEditorPaciente();
+  salvar();
+  renderTudo();
+  toast('Paciente excluído');
+}
+
+// Lembretes: de quais pacientes este celular avisa
+function renderLembretePacientes() {
+  const c = document.getElementById('card-lembrete-pac');
+  if (!c) return;
+  if (PACIENTES.length < 2) { c.style.display = 'none'; return; }
+  c.style.display = '';
+  const lista = estado.notif.pacientes;
+  c.innerHTML = `
+    <div class="ajuste-titulo">💊 Lembretes de quais pacientes</div>
+    <p class="dica">Escolha de quem este celular lembra as doses.</p>
+    ${PACIENTES.map(p => `<label style="display:flex; align-items:center; gap:0.5rem; margin:0.3rem 0; cursor:pointer;">
+      <input type="checkbox" style="width:18px;height:18px;" onchange="alternarLembretePac('${esc(p.id)}', this.checked)"
+        ${!Array.isArray(lista) || lista.includes(p.id) ? 'checked' : ''}> ${esc(p.emoji || '')} ${esc(p.nome)}</label>`).join('')}
+  `;
+}
+function alternarLembretePac(id, ligado) {
+  let lista = Array.isArray(estado.notif.pacientes) ? [...estado.notif.pacientes] : PACIENTES.map(p => p.id);
+  lista = ligado ? [...new Set([...lista, id])] : lista.filter(x => x !== id);
+  estado.notif.pacientes = lista;
+  salvarLocal();
+  atualizarListaAgendadas();
+  try { if (estado.notif.ativo && 'Notification' in window && Notification.permission === 'granted') reagendarTodas(); } catch (e) {}
+}
+
 /* =========================================================
    INICIAR
    ========================================================= */
 function renderTudo() {
   prepararMeds();
+  renderPacientes();
   renderHoje();
   renderSemana();
   renderMeds();
@@ -2745,6 +3040,7 @@ function renderTudo() {
   renderNotas();
   renderHistorico();
   renderAjustes();
+  renderLembretePacientes();
   atualizarListaAgendadas();
 }
 renderTudo();
@@ -2762,7 +3058,10 @@ if (sb) {
   // 1) puxa remoto -> merge com local
   // 2) empurra o resultado (garante que dados locais preexistentes subam)
   // 3) escuta mudanças em tempo real
-  pullMerge()
+  // Espera a chave (senha digitada ou guardada) antes de falar com a nuvem
+  window._chavePronta
+    .then(k => { _chave = k; })
+    .then(() => pullMerge())
     .then(() => pushRemote())
     .then(() => iniciarSubscribe());
 } else {
