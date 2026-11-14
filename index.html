@@ -771,6 +771,15 @@
   #lock .lock-link { display:inline-block; margin-top:0.9rem; color:rgba(255,255,255,0.85); font-size:0.85rem; }
   #lock .dica-lock { color:rgba(255,255,255,0.7); font-size:0.78rem; margin:-0.25rem 0 0.75rem; }
   #lock button:disabled { opacity:0.6; cursor:wait; }
+  /* Mostrar/esconder senha */
+  .senha-wrap { position:relative; }
+  .senha-wrap input { padding-right:3rem !important; }
+  button.olho, #lock button.olho { position:absolute; right:0.35rem; top:0.3rem; width:2.4rem; height:2.4rem; padding:0;
+    background:transparent; border:none; border-radius:8px; font-size:1.15rem; line-height:1; cursor:pointer; opacity:0.75; }
+  button.olho:hover, #lock button.olho:hover { opacity:1; background:rgba(127,127,127,0.15); }
+  .form-campo .senha-wrap button.olho { top:50%; transform:translateY(-50%); }
+  #lock button.olho { opacity:1; background:rgba(255,255,255,0.18); }
+  #lock button.olho:hover { background:rgba(255,255,255,0.3); }
   body.locked { overflow: hidden; }
   body.locked > *:not(#lock):not(script) { display: none !important; }
   /* ---- Administrador / editor de remédios ---- */
@@ -950,6 +959,37 @@ var SUPABASE_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS
   window.CuidadosAcesso = { embrulhar, desembrulhar, chaveGuardada, USER_KEY, PENDENTE, CACHE_USERS,
     sair() { [UNLOCK_KEY, CHAVE_KEY, USER_KEY].forEach(k => { try { localStorage.removeItem(k); } catch (e) {} }); location.reload(); } };
 
+  // Botão 👁 em todo campo de senha: toca para ver o que digitou, toca de novo para esconder
+  function adicionarOlhos(raiz) {
+    (raiz || document).querySelectorAll('input[type=password]').forEach(inp => {
+      if (inp.closest('.senha-wrap')) return;
+      const wrap = document.createElement('div');
+      wrap.className = 'senha-wrap';
+      if (inp.style.display === 'none') { wrap.style.display = 'none'; inp.style.display = ''; }
+      inp.parentNode.insertBefore(wrap, inp);
+      wrap.appendChild(inp);
+      const b = document.createElement('button');
+      b.type = 'button'; b.className = 'olho'; b.textContent = '👁';
+      b.title = 'Mostrar senha'; b.setAttribute('aria-label', 'Mostrar senha');
+      b.addEventListener('click', () => {
+        const ver = inp.type === 'password';
+        inp.type = ver ? 'text' : 'password';
+        b.textContent = ver ? '🙈' : '👁';
+        b.title = ver ? 'Esconder senha' : 'Mostrar senha';
+        b.setAttribute('aria-label', b.title);
+        inp.focus();
+      });
+      wrap.appendChild(b);
+    });
+  }
+  window.adicionarOlhos = adicionarOlhos;
+  window.esconderSenhas = raiz => (raiz || document).querySelectorAll('.senha-wrap').forEach(w => {
+    const inp = w.querySelector('input'), b = w.querySelector('.olho');
+    if (inp.type === 'text') { inp.type = 'password'; b.textContent = '👁'; b.title = 'Mostrar senha'; }
+  });
+
+  window.addEventListener('DOMContentLoaded', () => adicionarOlhos(document));
+
   // Já entrou neste aparelho?
   let modo = 'entrar';
   try {
@@ -969,11 +1009,12 @@ var SUPABASE_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS
     const $ = id => document.getElementById(id);
     const form = $('lock-form'), erro = $('lock-erro'), botao = $('lock-botao');
     if (!form) return;
+    const mostrar = (id, on) => { const el = $(id); (el.closest('.senha-wrap') || el).style.display = on ? '' : 'none'; };
 
     function aplicarModo() {
       const criar = modo !== 'entrar';
-      $('lock-senha2').style.display = criar ? '' : 'none';
-      $('lock-codigo').style.display = modo === 'criar' ? '' : 'none';
+      mostrar('lock-senha2', criar);
+      mostrar('lock-codigo', modo === 'criar');
       $('lock-trocar').style.display = modo === 'migrar' ? 'none' : '';
       $('lock-trocar').textContent = modo === 'entrar' ? 'Primeira vez aqui? Criar meu acesso' : 'Já tenho acesso — entrar';
       $('lock-input').placeholder = criar ? 'crie uma senha (mín. 6)' : 'sua senha';
@@ -2830,6 +2871,7 @@ function renderAjustes() {
    ========================================================= */
 function abrirTrocarSenha() {
   ['ts-atual', 'ts-nova', 'ts-nova2'].forEach(id => { document.getElementById(id).value = ''; });
+  if (window.esconderSenhas) window.esconderSenhas(document.getElementById('modal-senha'));
   document.getElementById('ts-erro').textContent = '';
   document.getElementById('modal-senha').classList.add('aberto');
   setTimeout(() => document.getElementById('ts-atual').focus(), 50);
