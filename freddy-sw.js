@@ -1,10 +1,13 @@
 // Service Worker — Cuidados do Freddy
-const CACHE = 'freddy-v11';
+const CACHE = 'freddy-v13';
 const ARQUIVOS = [
   './',
   './index.html',
   './freddy-manifest.webmanifest',
-  './assets/icon-freddy.svg'
+  './assets/icon-freddy.svg',
+  './assets/icon-192.png',
+  './assets/icon-512.png',
+  './assets/apple-touch-icon.png'
 ];
 
 self.addEventListener('install', (e) => {

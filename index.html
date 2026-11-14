@@ -3,13 +3,13 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Cuidados</title>
+<title>APP Cuidados Saúde</title>
 <link rel="manifest" href="freddy-manifest.webmanifest">
 <meta name="theme-color" content="#4a7a3a">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
-<meta name="apple-mobile-web-app-title" content="Cuidados">
-<link rel="apple-touch-icon" href="assets/icon-freddy.svg">
+<meta name="apple-mobile-web-app-title" content="Cuidados Saúde">
+<link rel="apple-touch-icon" href="assets/apple-touch-icon.png">
 <link rel="icon" type="image/svg+xml" href="assets/icon-freddy.svg">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -804,14 +804,36 @@
   @media (max-width: 600px) { .barra-pacientes { padding:0.6rem 1rem; } }
   .tag-pac { background: var(--verde-suave); color: var(--verde-escuro); }
   .ajuste-titulo { font-family:'Cormorant Garamond',serif; font-size:1.25rem; color:var(--verde-escuro); margin-bottom:0.5rem; }
+  /* ---- Vários médicos ---- */
+  .medicos-grid { display:grid; grid-template-columns:repeat(auto-fit, minmax(260px, 1fr)); gap:0.75rem; margin-bottom:1.5rem; }
+  .medicos-grid .vet-card { margin-bottom:0; }
+  .vet-card .receita { font-size:0.85rem; color:var(--texto); font-style:italic; margin-bottom:0.4rem; }
+  .vet-card .qtd { font-size:0.75rem; color:var(--texto-fraco); margin-top:0.5rem; }
+  .medico-bloco { border:1px solid var(--border-suave); border-radius:8px; padding:0.75rem; margin-bottom:0.6rem; background:#fff; }
+  /* ---- Estoque ---- */
+  .estoque-linha { display:flex; align-items:center; gap:0.6rem; flex-wrap:wrap; margin-top:0.6rem; padding:0.6rem 0.75rem;
+    border-radius:8px; background:#f9f7f2; font-size:0.88rem; }
+  .estoque-linha .txt { flex:1 1 200px; }
+  .estoque-linha.comprar { background:var(--amarelo); border-left:4px solid var(--oral); }
+  .estoque-linha.acabou { background:var(--pendente-bg); border-left:4px solid var(--pendente); }
+  .nivel { height:6px; border-radius:3px; background:var(--border-suave); overflow:hidden; margin-top:0.3rem; }
+  .nivel > div { height:100%; background:var(--verde-claro); }
+  .comprar .nivel > div { background:var(--oral); }
+  .acabou .nivel > div { background:var(--pendente); }
+  .alerta-compra { display:block; width:100%; text-align:left; cursor:pointer; font-family:inherit; font-size:0.92rem;
+    background:var(--amarelo); border:1px solid var(--oral); border-radius:10px; padding:0.75rem 1rem; margin-bottom:1rem; color:var(--texto); }
+  .alerta-compra.urgente { background:var(--pendente-bg); border-color:var(--pendente); }
+  .alerta-compra strong { color:var(--verde-escuro); }
+  .tag-comprar { background:var(--oral-bg); color:#8c6820; }
+  .tag-acabou { background:var(--pendente-bg); color:var(--pendente); }
 </style>
 </head>
 <body class="locked">
 
 <div id="lock">
   <div class="box">
-    <div class="emoji">🐶🔒</div>
-    <h1>Cuidados</h1>
+    <div class="emoji">🏥🔒</div>
+    <h1>APP Cuidados Saúde</h1>
     <div class="sub">Digite a senha para continuar</div>
     <form id="lock-form" autocomplete="off">
       <input type="password" id="lock-input" inputmode="numeric" placeholder="senha" autofocus>
@@ -932,6 +954,7 @@
   <button data-aba="hoje" class="ativo">Hoje</button>
   <button data-aba="semana">Semana</button>
   <button data-aba="meds">Medicamentos</button>
+  <button data-aba="estoque">🛒 Estoque</button>
   <button data-aba="banhos">Banhos</button>
   <button data-aba="anotacoes">Anotações</button>
   <button data-aba="historico">Histórico</button>
@@ -964,6 +987,7 @@
       </div>
     </div>
 
+    <div id="hoje-compras"></div>
     <div id="hoje-lista"></div>
   </section>
 
@@ -996,6 +1020,13 @@
 
     <div id="meds-admin"></div>
     <div id="meds-lista"></div>
+  </section>
+
+  <!-- ESTOQUE -->
+  <section class="aba" id="aba-estoque">
+    <h2 class="titulo-aba">🛒 Estoque & compras</h2>
+    <div class="subtitulo-aba">Quanto ainda tem de cada remédio e quando é hora de comprar mais. O estoque desce sozinho a cada dose marcada como dada.</div>
+    <div id="estoque-conteudo"></div>
   </section>
 
   <!-- BANHOS -->
@@ -1212,10 +1243,26 @@ const MEDS_PADRAO = [
 // Pacientes (sincronizados). O Freddy é o primeiro; outros são criados no app.
 const PACIENTES_PADRAO = [
   { id: 'freddy', ordem: 1, nome: 'Freddy', emoji: '🐶', descricao: 'Shih Tzu · 14 anos · 4,35 kg · macho castrado',
-    receita: 'Prescrição de 28/07/2026 — Dr. Douglas Moreira Teixeira',
-    medicoTitulo: 'Veterinário Responsável', medicoNome: 'Dr. Douglas Moreira Teixeira',
-    medicoDetalhes: 'Especialidade: Dermatologia Veterinária\nCRMV-RS: 23.179\nCel: (51) 99004-9026\nE-mail: douglas.teixeu@gmail.com' },
+    receita: '',
+    medicos: [{ id: 'principal', titulo: 'Dermatologista Veterinário', nome: 'Dr. Douglas Moreira Teixeira',
+      receita: 'Prescrição de 28/07/2026',
+      detalhes: 'CRMV-RS: 23.179\nCel: (51) 99004-9026\nE-mail: douglas.teixeu@gmail.com' }] },
 ];
+
+// Médicos do paciente. Formato antigo (um médico só, campos medicoNome etc.)
+// vira um médico com id 'principal' — os remédios antigos apontam para ele.
+function medicosDe(p) {
+  if (!p) return [];
+  if (Array.isArray(p.medicos)) return p.medicos.filter(m => m && m.id);
+  if (p.medicoNome || p.medicoDetalhes) {
+    return [{ id: 'principal', titulo: p.medicoTitulo || 'Médico responsável', nome: p.medicoNome || '',
+      detalhes: p.medicoDetalhes || '', receita: p.receita || '' }];
+  }
+  return [];
+}
+function medicoDoMed(m) {
+  return medicosDe(pacientePorId(m.paciente)).find(d => d.id === (m.medico || 'principal')) || null;
+}
 function pacientesPadrao() {
   return PACIENTES_PADRAO.map(p => ({ ...p, atualizado: MEDS_PADRAO_T }));
 }
@@ -1231,7 +1278,7 @@ function addDias(iso, n) {
 }
 
 // Gera {data, hora, obs?}[] a partir das regras de um remédio
-function gerarDosesRegras(regras, hojeDate) {
+function gerarDosesRegras(regras, hojeDate, diasFrente = 30) {
   const hoje = fmtISO(hojeDate);
   const out = [];
   const vistos = new Set();
@@ -1250,7 +1297,7 @@ function gerarDosesRegras(regras, hojeDate) {
     const horas = [...(r.horas || [])].sort();
     if (!r.inicio || horas.length === 0) continue;
     const passo = r.tipo === 'intervalo' ? Math.max(1, parseInt(r.cadaDias, 10) || 1) : 1;
-    let limite = addDias(hoje, r.tipo === 'intervalo' ? Math.max(30, passo * 2) : 30);
+    let limite = addDias(hoje, r.tipo === 'intervalo' ? Math.max(diasFrente, passo * 2) : diasFrente);
     if (r.fim && r.fim < limite) limite = r.fim;
     let cur = r.inicio, guarda = 0;
     while (cur <= limite && guarda++ < 3000) {
@@ -1333,6 +1380,8 @@ function normalizarEstado(s) {
   s.config = s.config || {};            // sincronizado: ntfyTopico, adminHash
   s.eu = { nome: '', admin: false, ...(s.eu || {}) };   // só deste celular
   s.filaAvisos = Array.isArray(s.filaAvisos) ? s.filaAvisos : [];
+  s.estoque = s.estoque || {};          // sincronizado: {medId: {qtd, t, quem}} — contagem base
+  s.avisosEstoque = s.avisosEstoque || {};   // sincronizado: {medId: t da contagem já avisada}
   return s;
 }
 function salvarLocal() {
@@ -1452,7 +1501,18 @@ function mergeEstado(remoto) {
   // config: o mais recente vence
   const lc = estado.config || {}, rc = remoto.config || {};
   const config = (lc.atualizado || '') >= (rc.atualizado || '') ? lc : rc;
+  // estoque: por remédio, a contagem mais recente vence
+  const estoque = { ...(remoto.estoque || {}) };
+  for (const [k, v] of Object.entries(estado.estoque || {})) {
+    if (v && (!estoque[k] || (v.t || '') >= (estoque[k].t || ''))) estoque[k] = v;
+  }
+  const avisosEstoque = { ...(remoto.avisosEstoque || {}) };
+  for (const [k, v] of Object.entries(estado.avisosEstoque || {})) {
+    if ((v || '') >= (avisosEstoque[k] || '')) avisosEstoque[k] = v;
+  }
 
+  estado.estoque = estoque;
+  estado.avisosEstoque = avisosEstoque;
   estado.feitas = feitas;
   estado.notas = notas;
   estado.historico = historico;
@@ -1483,6 +1543,7 @@ async function pullMerge(silencioso = false) {
       mergeEstado(dados);
       salvarLocal();
       renderTudo();
+      verificarEstoque();
       // Nuvem ainda sem cifra, ou celular antigo apagou campos: regrava
       if (!cifrado || !dados.meds || !dados.pacientes || (!dados.config && estado.config.atualizado)) agendarPush();
     }
@@ -1516,6 +1577,8 @@ async function pushRemote() {
       meds: estado.meds || [],
       pacientes: estado.pacientes || [],
       config: estado.config || {},
+      estoque: estado.estoque || {},
+      avisosEstoque: estado.avisosEstoque || {},
     };
     const { error } = await sb.from('freddy_estado').upsert({
       id: 1, dados: await cifrar(dados), atualizado_em: new Date().toISOString()
@@ -1618,6 +1681,7 @@ function marcarDose(medId, data, hora, feita) {
   renderTudo();
   toast(feita ? '✓ Marcado como dado' : 'Desmarcado');
   avisarAdmin(med, data, hora, feita);
+  if (feita) verificarEstoque();
   // Cancela ou reagenda a notificação relacionada
   if ('Notification' in window && Notification.permission === 'granted' && swReg) {
     swReg.getNotifications({ tag: k }).then(ns => ns.forEach(n => n.close())).catch(()=>{});
@@ -1669,6 +1733,15 @@ function renderHoje() {
   document.getElementById('stat-banho').innerHTML = proxBanho
     ? `${fmtBR(proxBanho.data).slice(0,5)} <small>· ${DIAS_SEMANA_CURTO[new Date(proxBanho.data + 'T12:00:00').getDay()]}</small>`
     : '<small>—</small>';
+
+  // Aviso de compra
+  const compras = listaCompras();
+  const urgente = compras.some(c => c.est.nivel === 'acabou');
+  document.getElementById('hoje-compras').innerHTML = compras.length ? `
+    <button class="alerta-compra${urgente ? ' urgente' : ''}" onclick="irPara('estoque')">
+      🛒 <strong>Hora de comprar:</strong>
+      ${compras.map(c => `${mostrandoTodos() ? esc(emojiPaciente(c.med.paciente)) + ' ' : ''}${esc(c.med.nome)} <small>— ${esc(textoAcaba(c.est))}</small>`).join(' · ')}
+    </button>` : '';
 
   // Lista de doses agrupadas
   const cont = document.getElementById('hoje-lista');
@@ -1800,15 +1873,21 @@ function renderMeds() {
   const pac = sel === 'todos' ? null : pacientePorId(sel);
   document.getElementById('meds-receita').textContent = pac ? (pac.receita || '') : 'Todos os pacientes';
   const medico = document.getElementById('meds-medico');
-  medico.innerHTML = pac && (pac.medicoNome || pac.medicoDetalhes) ? `
+  const medicos = pac ? medicosDe(pac) : [];
+  medico.innerHTML = medicos.length ? `<div class="medicos-grid">${medicos.map(d => {
+    const n = MEDS.filter(m => m.paciente === pac.id && (m.medico || 'principal') === d.id).length;
+    return `
     <div class="vet-card">
-      <div class="rotulo">${esc(pac.medicoTitulo || 'Médico responsável')}</div>
-      <div class="nome">${esc(pac.medicoNome || '')}</div>
-      <div class="detalhes">${String(pac.medicoDetalhes || '').split('\n').filter(Boolean).map(l => {
+      <div class="rotulo">${esc(d.titulo || 'Médico')}</div>
+      <div class="nome">${esc(d.nome || '')}</div>
+      ${d.receita ? `<div class="receita">${esc(d.receita)}</div>` : ''}
+      <div class="detalhes">${String(d.detalhes || '').split('\n').filter(Boolean).map(l => {
         const i = l.indexOf(':');
         return i > 0 ? `<span><strong>${esc(l.slice(0, i + 1))}</strong>${esc(l.slice(i + 1))}</span>` : `<span>${esc(l)}</span>`;
       }).join('')}</div>
-    </div>` : '';
+      <div class="qtd">💊 ${n} remédio${n === 1 ? '' : 's'}</div>
+    </div>`;
+  }).join('')}</div>` : '';
 
   const barra = document.getElementById('meds-admin');
   barra.innerHTML = admin
@@ -1831,6 +1910,8 @@ function renderMeds() {
     const proxima = doses.find(x => !isFeita(keyDose(x.med.id, x.data, x.hora)) && x.data >= hoje);
 
     const foto = estado.fotos[m.id];
+    const doutor = medicoDoMed(m);
+    const est = calcEstoque(m);
 
     const card = document.createElement('div');
     card.className = 'med-card';
@@ -1867,9 +1948,11 @@ function renderMeds() {
         <div class="campo"><div class="rot">Via</div><div class="valor">${esc(m.via)}</div></div>
         <div class="campo"><div class="rot">Frequência</div><div class="valor">${esc(m.frequencia)}</div></div>
         ${m.valor ? `<div class="campo"><div class="rot">Valor</div><div class="valor">${esc(m.valor)}</div></div>` : ''}
+        ${doutor ? `<div class="campo"><div class="rot">Receitado por</div><div class="valor">${esc(doutor.nome || doutor.titulo)}</div></div>` : ''}
         <div class="campo"><div class="rot">Próxima dose</div><div class="valor">${proxima ? fmtBR(proxima.data) + ' às ' + proxima.hora : '—'}</div></div>
       </div>
       <div class="med-instrucao" style="white-space:pre-line;">${esc(m.instrucao)}</div>
+      ${est ? htmlEstoque(m, est) : ''}
       ${admin ? `
         <div class="med-admin-acoes">
           <button class="btn sec pequeno" data-editar="${m.id}">✏️ Editar</button>
@@ -2433,8 +2516,8 @@ async function testarNotif() {
     icon: 'assets/icon-freddy.svg',
     badge: 'assets/icon-freddy.svg'
   };
-  if (swReg) await swReg.showNotification('Cuidados · teste', opts);
-  else new Notification('Cuidados · teste', opts);
+  if (swReg) await swReg.showNotification('Cuidados Saúde · teste', opts);
+  else new Notification('Cuidados Saúde · teste', opts);
 }
 
 async function limparAgendadas() {
@@ -2617,7 +2700,7 @@ async function testarAviso() {
   const topic = estado.config.ntfyTopico;
   if (!topic) return;
   try {
-    const r = await publicarNtfy({ topic, title: '💊 Teste — Cuidados', message: 'Se você está vendo isto, os avisos estão funcionando!', tags: ['pill'] });
+    const r = await publicarNtfy({ topic, title: '💊 Teste — Cuidados Saúde', message: 'Se você está vendo isto, os avisos estão funcionando!', tags: ['pill'] });
     toast(r.ok ? '✓ Aviso de teste enviado' : 'Falhou (' + r.status + ')');
   } catch (e) {
     toast('Sem internet para enviar o teste');
@@ -2659,6 +2742,260 @@ async function enviarFilaAvisos() {
 }
 
 /* =========================================================
+   ESTOQUE E AVISO DE COMPRA
+   - Config no remédio (admin): m.estoque = {controlar, unidade, porDose, avisarDias}
+   - Contagem (qualquer pessoa): estado.estoque[medId] = {qtd, t, quem}
+   - Restante = contagem − porDose × (doses marcadas como dadas depois da contagem)
+   ========================================================= */
+function parseNum(s) {
+  const t = String(s == null ? '' : s).trim().replace('½', '0.5').replace('¼', '0.25').replace('¾', '0.75').replace(',', '.');
+  if (!t) return NaN;
+  const fr = t.match(/^(\d+)\s*\/\s*(\d+)$/);
+  if (fr) return +fr[1] / +fr[2];
+  return parseFloat(t);
+}
+// Palpite de quanto se gasta por dose a partir do texto da dosagem ("½ comprimido" → 0.5)
+function palpitePorDose(dosagem) {
+  const mm = String(dosagem || '').match(/^\s*(½|¼|¾|\d+\s*\/\s*\d+|\d+(?:[.,]\d+)?)/);
+  const n = mm ? parseNum(mm[1]) : NaN;
+  return n > 0 ? n : 1;
+}
+function palpiteUnidade(dosagem) {
+  const d = String(dosagem || '').toLowerCase();
+  if (/comprim|cp\b/.test(d)) return 'comprimidos';
+  if (/c[aá]psul/.test(d)) return 'cápsulas';
+  if (/sach/.test(d)) return 'sachês';
+  if (/gota/.test(d)) return 'gotas';
+  if (/\bml\b/.test(d)) return 'mL';
+  if (/ampol/.test(d)) return 'ampolas';
+  return 'doses';
+}
+function fmtQtd(n, unidade) {
+  const v = Math.round(n * 100) / 100;
+  return `${String(v).replace('.', ',')} ${unidade || ''}`.trim();
+}
+
+function calcEstoque(m) {
+  const cfg = m && m.estoque;
+  if (!cfg || !cfg.controlar) return null;
+  const porDose = parseNum(cfg.porDose) > 0 ? parseNum(cfg.porDose) : 1;
+  const unidade = cfg.unidade || 'doses';
+  const avisarDias = Number.isFinite(+cfg.avisarDias) ? +cfg.avisarDias : 7;
+  const base = estado.estoque[m.id];
+  if (!base) return { nivel: 'semcontagem', porDose, unidade, avisarDias };
+
+  let usado = 0;
+  const pref = m.id + '|';
+  for (const [k, v] of Object.entries(estado.feitas)) {
+    if (!k.startsWith(pref) || !v || v.v !== true) continue;
+    if ((v.t || '') > (base.t || '')) usado += porDose;
+  }
+  const restante = Math.max(0, Math.round((base.qtd - usado) * 100) / 100);
+
+  // Previsão: percorre as próximas doses ainda não dadas até o estoque não bastar
+  const hoje = hojeISO();
+  let acabaEm = null, ultima = null, futuras = 0;
+  if (m.ativo !== false) {
+    let saldo = restante;
+    const doses = gerarDosesRegras(m.regras, new Date(), 180)
+      .filter(d => d.data >= hoje && !isFeita(keyDose(m.id, d.data, d.hora)))
+      .sort((a, b) => (a.data + a.hora).localeCompare(b.data + b.hora));
+    futuras = doses.length;
+    for (const d of doses) {
+      if (saldo + 1e-9 < porDose) { acabaEm = d.data; break; }
+      saldo -= porDose;
+      ultima = d.data;
+    }
+  }
+  const dias = acabaEm ? Math.round((new Date(acabaEm + 'T12:00:00') - new Date(hoje + 'T12:00:00')) / 864e5) : null;
+  let nivel = 'ok';
+  if (restante + 1e-9 < porDose && (futuras > 0 || restante <= 0)) nivel = 'acabou';
+  else if (dias != null && dias <= avisarDias) nivel = 'comprar';
+  return { nivel, restante, porDose, unidade, avisarDias, base, acabaEm, dias, ultima, futuras,
+           pct: base.qtd > 0 ? Math.min(100, Math.round(restante / base.qtd * 100)) : 0 };
+}
+
+function textoAcaba(est) {
+  if (est.nivel === 'semcontagem') return 'falta contar quanto tem';
+  if (est.nivel === 'acabou') return est.restante <= 0 ? 'acabou!' : 'não dá para a próxima dose';
+  if (est.dias != null) {
+    if (est.dias <= 0) return 'acaba hoje';
+    if (est.dias === 1) return 'acaba amanhã';
+    return `acaba ~${fmtBR(est.acabaEm).slice(0, 5)} (${est.dias} dias)`;
+  }
+  if (!est.futuras) return 'sem doses previstas';
+  if (est.ultima && est.ultima >= addDias(hojeISO(), 170)) return 'dá para mais de 5 meses';
+  return 'dá até o fim do tratamento';
+}
+
+function htmlEstoque(m, est) {
+  return `
+    <div class="estoque-linha ${est.nivel}">
+      <div class="txt">📦 <strong>Estoque:</strong>
+        ${est.nivel === 'semcontagem' ? '' : esc(fmtQtd(est.restante, est.unidade)) + ' · '}${esc(textoAcaba(est))}
+        ${est.nivel === 'semcontagem' ? '' : `<div class="nivel"><div style="width:${est.pct}%"></div></div>`}
+      </div>
+      <button class="btn sec pequeno" onclick="registrarCompra('${esc(m.id)}')">🛒 Comprei</button>
+      <button class="btn sec pequeno" onclick="corrigirEstoque('${esc(m.id)}')">✏️ Contar</button>
+    </div>`;
+}
+
+// Remédios visíveis que precisam ser comprados, os mais urgentes primeiro
+function listaCompras(todosPacientes) {
+  const out = [];
+  for (const m of MEDS) {
+    if (m.ativo === false || (!todosPacientes && !visivelPaciente(m.paciente))) continue;
+    const est = calcEstoque(m);
+    if (est && (est.nivel === 'comprar' || est.nivel === 'acabou')) out.push({ med: m, est });
+  }
+  return out.sort((a, b) => (a.est.nivel === 'acabou' ? -1 : a.est.dias) - (b.est.nivel === 'acabou' ? -1 : b.est.dias));
+}
+
+function gravarContagem(m, qtd, acao, detalhe) {
+  const agora = new Date().toISOString();
+  estado.estoque[m.id] = { qtd: Math.round(qtd * 100) / 100, t: agora, quem: estado.eu.nome || '' };
+  estado.historico.unshift({ quando: agora, med: m.nome, dose: detalhe, acao, quem: estado.eu.nome || '', paciente: m.paciente });
+  estado.historico = estado.historico.slice(0, 200);
+  salvar();
+  renderTudo();
+}
+
+function registrarCompra(medId) {
+  const m = MEDS.find(x => x.id === medId);
+  const est = m && calcEstoque(m);
+  if (!est) return;
+  garantirNome();
+  const r = prompt(`Quantos ${est.unidade} de "${m.nome}" chegaram?\n(Ex.: caixa com 30 comprimidos → 30)`);
+  if (r == null) return;
+  const n = parseNum(r);
+  if (!(n > 0)) { alert('Digite um número maior que zero.'); return; }
+  if (est.nivel === 'semcontagem') {
+    const tinha = prompt(`E quantos ${est.unidade} já tinha antes dessa compra? (0 se nada)`, '0');
+    if (tinha == null) return;
+    const t = parseNum(tinha) || 0;
+    gravarContagem(m, t + n, 'compra registrada', `+${fmtQtd(n, est.unidade)} → ${fmtQtd(t + n, est.unidade)}`);
+  } else {
+    const novo = est.restante + n;
+    gravarContagem(m, novo, 'compra registrada', `+${fmtQtd(n, est.unidade)} → ${fmtQtd(novo, est.unidade)}`);
+  }
+  toast('🛒 Compra registrada');
+}
+
+function corrigirEstoque(medId) {
+  const m = MEDS.find(x => x.id === medId);
+  const est = m && calcEstoque(m);
+  if (!est) return;
+  garantirNome();
+  const r = prompt(`Quantos ${est.unidade} de "${m.nome}" tem agora?\n(conte o que sobrou na embalagem)`,
+    est.nivel === 'semcontagem' ? '' : String(est.restante).replace('.', ','));
+  if (r == null) return;
+  const n = parseNum(r);
+  if (!(n >= 0)) { alert('Digite um número (pode ser 0).'); return; }
+  gravarContagem(m, n, 'estoque contado', fmtQtd(n, est.unidade));
+  toast('📦 Estoque atualizado');
+}
+
+// Avisa (uma vez por contagem) quando um remédio entra na hora de comprar
+function verificarEstoque() {
+  let mudou = false;
+  for (const m of MEDS) {
+    if (m.ativo === false) continue;
+    const est = calcEstoque(m);
+    if (!est || !est.base || (est.nivel !== 'comprar' && est.nivel !== 'acabou')) continue;
+    if (estado.avisosEstoque[m.id] === est.base.t) continue;
+    estado.avisosEstoque[m.id] = est.base.t;
+    mudou = true;
+    const titulo = `🛒 Comprar ${m.nome} — ${nomePaciente(m.paciente)}`;
+    const msg = `Restam ${fmtQtd(est.restante, est.unidade)}: ${textoAcaba(est)}.`;
+    const topic = estado.config && estado.config.ntfyTopico;
+    if (topic) estado.filaAvisos.push({ topic, title: titulo, message: msg, tags: ['shopping_cart'], priority: est.nivel === 'acabou' ? 4 : 3 });
+    try {
+      if ('Notification' in window && Notification.permission === 'granted' && swReg) {
+        swReg.showNotification(titulo, { body: msg, icon: 'assets/icon-freddy.svg', tag: 'estoque|' + m.id });
+      }
+    } catch (e) {}
+  }
+  if (mudou) {
+    estado.filaAvisos = estado.filaAvisos.slice(-30);
+    salvar();
+    enviarFilaAvisos();
+  }
+}
+
+function textoListaCompras(itens) {
+  return '🛒 Lista de compras — Cuidados Saúde\n' + itens.map(c =>
+    `• ${PACIENTES.length > 1 ? nomePaciente(c.med.paciente) + ': ' : ''}${c.med.nome}` +
+    ` — ${textoAcaba(c.est)} (restam ${fmtQtd(c.est.restante, c.est.unidade)})` +
+    (medicoDoMed(c.med) ? ` · receita: ${medicoDoMed(c.med).nome}` : '')).join('\n');
+}
+function compartilharCompras() {
+  const txt = textoListaCompras(listaCompras());
+  if (navigator.share) { navigator.share({ text: txt }).catch(() => {}); return; }
+  (navigator.clipboard ? navigator.clipboard.writeText(txt) : Promise.reject())
+    .then(() => toast('📋 Lista copiada'))
+    .catch(() => prompt('Copie a lista:', txt));
+}
+
+function irPara(aba) {
+  const b = document.querySelector(`nav [data-aba="${aba}"]`);
+  if (b) b.click();
+}
+
+function renderEstoque() {
+  const cont = document.getElementById('estoque-conteudo');
+  if (!cont) return;
+  const admin = !!estado.eu.admin;
+  const visiveis = MEDS.filter(m => visivelPaciente(m.paciente) && m.ativo !== false);
+  const comEst = visiveis.map(m => ({ med: m, est: calcEstoque(m) })).filter(x => x.est);
+  const semEst = visiveis.filter(m => !calcEstoque(m));
+  const compras = listaCompras();
+  const tagPac = m => mostrandoTodos() ? `<span class="tag tag-pac">${esc(emojiPaciente(m.paciente))} ${esc(nomePaciente(m.paciente))}</span> ` : '';
+  const ordemNivel = { acabou: 0, comprar: 1, semcontagem: 2, ok: 3 };
+  comEst.sort((a, b) => (ordemNivel[a.est.nivel] - ordemNivel[b.est.nivel]) || ((a.est.dias ?? 999) - (b.est.dias ?? 999)));
+
+  let h = '';
+  h += `<div class="card${compras.length ? ' destaque' : ''}">
+    <div class="ajuste-titulo">🛒 Para comprar</div>
+    ${compras.length ? `
+      ${compras.map(c => `<div style="padding:0.35rem 0; border-bottom:1px solid var(--border-suave);">
+        ${tagPac(c.med)}<strong>${esc(c.med.nome)}</strong>
+        <span class="tag ${c.est.nivel === 'acabou' ? 'tag-acabou' : 'tag-comprar'}">${esc(textoAcaba(c.est))}</span>
+        <span class="dica" style="display:inline;"> restam ${esc(fmtQtd(c.est.restante, c.est.unidade))}</span>
+      </div>`).join('')}
+      <div style="margin-top:0.75rem;"><button class="btn" onclick="compartilharCompras()">📋 Enviar / copiar lista</button></div>`
+    : `<p class="dica">Nada para comprar agora. ${comEst.length ? 'O aviso aparece aqui (e no celular do administrador) quando faltar pouco.' : ''}</p>`}
+  </div>`;
+
+  if (comEst.length) {
+    h += `<div class="grupo-titulo">Estoque dos remédios <span class="contador">${comEst.length}</span></div>`;
+    h += comEst.map(({ med: m, est }) => {
+      const d = medicoDoMed(m);
+      return `<div class="card" style="padding:0.9rem 1rem;">
+        <div style="display:flex; justify-content:space-between; gap:0.5rem; flex-wrap:wrap;">
+          <div>${tagPac(m)}<strong>${esc(m.nome)}</strong>
+            <span class="dica" style="display:inline;">· ${esc(fmtQtd(est.porDose, est.unidade))} por dose · aviso com ${est.avisarDias} dias</span></div>
+          ${d ? `<span class="dica" style="margin:0;">👨‍⚕️ ${esc(d.nome || d.titulo)}</span>` : ''}
+        </div>
+        ${htmlEstoque(m, est)}
+      </div>`;
+    }).join('');
+  }
+
+  if (semEst.length) {
+    h += `<div class="card">
+      <div class="ajuste-titulo">Sem controle de estoque</div>
+      <p class="dica">${admin ? 'Para controlar, toque em ✏️ e marque “Controlar estoque”.' : 'O administrador pode ligar o controle de estoque destes remédios.'}</p>
+      ${semEst.map(m => `<div style="display:flex; justify-content:space-between; align-items:center; padding:0.3rem 0; border-bottom:1px solid var(--border-suave);">
+        <span>${tagPac(m)}${esc(m.nome)}</span>
+        ${admin ? `<button class="btn sec pequeno" onclick="abrirEditorMed('${esc(m.id)}')">✏️</button>` : ''}
+      </div>`).join('')}
+    </div>`;
+  }
+  if (!visiveis.length) h += '<div class="card vazio">Nenhum remédio ativo.</div>';
+  cont.innerHTML = h;
+}
+
+/* =========================================================
    EDITOR DE REMÉDIOS (administrador)
    ========================================================= */
 let _edit = null;   // { med, novo }
@@ -2670,7 +3007,10 @@ function abrirEditorMed(medId) {
     id: '', paciente: pacienteSel() !== 'todos' ? pacienteSel() : (PACIENTES[0] || {}).id, nome: '', tipo: 'oral', tipoLabel: '', dosagem: '', via: 'Oral', frequencia: '', valor: '', instrucao: '', ativo: true,
     regras: [{ tipo: 'intervalo', inicio: hojeISO(), cadaDias: 1, horas: ['09:00'] }],
   };
-  _edit = { med, novo: !orig };
+  if (!orig) { const docs = medicosDe(pacientePorId(med.paciente)); med.medico = docs.length ? docs[0].id : '-'; }
+  const estAtual = orig ? calcEstoque(MEDS.find(x => x.id === medId) || {}) : null;
+  const qtdInicial = estAtual && estAtual.base ? String(estAtual.restante).replace('.', ',') : '';
+  _edit = { med, novo: !orig, qtdTxt: qtdInicial, qtdInicial };
   document.getElementById('modal-med-titulo').textContent = orig ? 'Editar remédio' : 'Novo remédio';
   renderEditorMed();
   document.getElementById('modal-med').classList.add('aberto');
@@ -2687,8 +3027,26 @@ function renderEditorMed() {
   const regrasHTML = (m.regras || []).map((r, i) => renderRegra(r, i)).join('')
     || '<p class="dica">Sem horários: o remédio aparece na lista, mas não na agenda.</p>';
   const opPac = PACIENTES.map(p => `<option value="${esc(p.id)}" ${(m.paciente || 'freddy') === p.id ? 'selected' : ''}>${esc(p.emoji || '')} ${esc(p.nome)}</option>`).join('');
+  const docs = medicosDe(pacientePorId(m.paciente));
+  const medSel = docs.some(d => d.id === (m.medico || 'principal')) ? (m.medico || 'principal') : '-';
+  const opMed = docs.map(d => `<option value="${esc(d.id)}" ${medSel === d.id ? 'selected' : ''}>${esc(d.nome || d.titulo)}${d.titulo && d.nome ? ' — ' + esc(d.titulo) : ''}</option>`).join('')
+    + `<option value="-" ${medSel === '-' ? 'selected' : ''}>— não informado —</option>`;
+  const e = m.estoque || {};
+  const estoqueHTML = e.controlar ? `
+    <div class="form-linha">
+      <div class="form-campo"><label>Unidade</label><input type="text" id="ed-est-un" value="${esc(e.unidade || '')}" placeholder="comprimidos"></div>
+      <div class="form-campo"><label>Gasta por dose</label><input type="text" inputmode="decimal" id="ed-est-pd" value="${esc(String(e.porDose ?? '').replace('.', ','))}" placeholder="0,5"></div>
+    </div>
+    <div class="form-linha">
+      <div class="form-campo"><label>Quanto tem agora</label><input type="text" inputmode="decimal" id="ed-est-qtd" value="${esc(_edit.qtdTxt)}" placeholder="Ex.: 28"></div>
+      <div class="form-campo"><label>Avisar quando faltar (dias)</label><input type="number" min="0" id="ed-est-av" value="${esc(e.avisarDias ?? 7)}"></div>
+    </div>
+    <p class="dica">O estoque desce sozinho a cada dose marcada como dada. Quando chegar a ${esc(e.avisarDias ?? 7)} dias de remédio, aparece o aviso de compra (e vai pelo ntfy, se ativado).</p>` : '';
   document.getElementById('modal-med-corpo').innerHTML = `
-    <div class="form-campo"><label>Paciente</label><select id="ed-paciente">${opPac}</select></div>
+    <div class="form-linha">
+      <div class="form-campo"><label>Paciente</label><select id="ed-paciente" onchange="lerEditorMed(false); _edit.med.medico = (medicosDe(pacientePorId(this.value))[0] || {id:'-'}).id; renderEditorMed();">${opPac}</select></div>
+      <div class="form-campo"><label>Médico que receitou</label><select id="ed-medico">${opMed}</select></div>
+    </div>
     <div class="form-campo"><label>Nome *</label><input type="text" id="ed-nome" value="${esc(m.nome)}" placeholder="Ex.: Apoquel 3,6mg"></div>
     <div class="form-linha">
       <div class="form-campo"><label>Tipo</label><select id="ed-tipo">${opTipo}</select></div>
@@ -2708,6 +3066,12 @@ function renderEditorMed() {
         </label>
       </div>
     </div>
+
+    <div class="ajuste-titulo" style="margin-top:0.75rem;">📦 Estoque</div>
+    <label style="display:flex; gap:0.4rem; align-items:center; color:var(--texto); font-size:0.9rem; margin-bottom:0.5rem;">
+      <input type="checkbox" id="ed-est-on" ${e.controlar ? 'checked' : ''} onchange="alternarEstoqueEditor(this.checked)"> Controlar estoque e avisar quando for hora de comprar
+    </label>
+    ${estoqueHTML}
 
     <div class="ajuste-titulo" style="margin-top:0.75rem;">Quando dar</div>
     ${!_edit.novo ? `<p class="dica">Vai mudar horário ou frequência? Use <strong>“Mudar a partir de hoje”</strong> para não bagunçar as doses que já foram marcadas no passado.</p>` : ''}
@@ -2781,7 +3145,16 @@ function lerEditorMed(estrito) {
   m.paciente = v('ed-paciente'); m.nome = v('ed-nome'); m.tipo = v('ed-tipo'); m.tipoLabel = v('ed-label');
   m.dosagem = v('ed-dosagem'); m.via = v('ed-via'); m.frequencia = v('ed-freq');
   m.instrucao = v('ed-inst'); m.valor = v('ed-valor');
+  m.medico = v('ed-medico') || '-';
   m.ativo = !document.getElementById('ed-pausado').checked;
+  if (m.estoque && m.estoque.controlar && document.getElementById('ed-est-un')) {
+    const pd = parseNum(v('ed-est-pd'));
+    if (estrito && !(pd > 0)) throw new Error('Informe quanto se gasta por dose (ex.: 0,5 ou 1).');
+    m.estoque = { controlar: true, unidade: v('ed-est-un') || 'doses', porDose: pd > 0 ? pd : 1,
+                  avisarDias: Math.max(0, parseInt(v('ed-est-av'), 10) || 0) };
+    _edit.qtdTxt = v('ed-est-qtd');
+    if (estrito && _edit.qtdTxt && !(parseNum(_edit.qtdTxt) >= 0)) throw new Error('A quantidade em estoque precisa ser um número.');
+  }
   const corpo = document.getElementById('modal-med-corpo');
   (m.regras || []).forEach((r, i) => {
     const campo = f => corpo.querySelector(`[data-r="${i}"][data-f="${f}"]`);
@@ -2805,6 +3178,15 @@ function lerEditorMed(estrito) {
       }
     } catch (e) { if (estrito) throw e; }
   });
+}
+
+function alternarEstoqueEditor(ligado) {
+  lerEditorMed(false);
+  const m = _edit.med;
+  m.estoque = ligado
+    ? { unidade: palpiteUnidade(m.dosagem), porDose: palpitePorDose(m.dosagem), avisarDias: 7, ...(m.estoque || {}), controlar: true }
+    : { ...(m.estoque || {}), controlar: false };
+  renderEditorMed();
 }
 
 function addRegra() {
@@ -2864,6 +3246,9 @@ function salvarEditorMed() {
     const i = estado.meds.findIndex(x => x.id === m.id);
     if (i >= 0) estado.meds[i] = m; else estado.meds.push(m);
   }
+  if (m.estoque && m.estoque.controlar && _edit.qtdTxt && _edit.qtdTxt !== _edit.qtdInicial) {
+    estado.estoque[m.id] = { qtd: Math.round(parseNum(_edit.qtdTxt) * 100) / 100, t: new Date().toISOString(), quem: estado.eu.nome || '' };
+  }
   fecharEditorMed();
   aposMudarMeds('✓ Remédio salvo');
 }
@@ -2892,6 +3277,7 @@ function excluirMed(medId) {
 function aposMudarMeds(msg) {
   salvar();
   renderTudo();
+  verificarEstoque();
   toast(msg);
   try {
     if (estado.notif.ativo && 'Notification' in window && Notification.permission === 'granted') reagendarTodas();
@@ -2922,7 +3308,7 @@ function renderPacientes() {
   // Cabeçalho
   const p = sel === 'todos' ? null : pacientePorId(sel);
   document.getElementById('cab-avatar').textContent = p ? (p.emoji || '👤') : '👥';
-  document.getElementById('cab-nome').innerHTML = p ? `${esc(p.nome)} <span>· cuidados</span>` : `Cuidados <span>· todos</span>`;
+  document.getElementById('cab-nome').innerHTML = p ? `${esc(p.nome)} <span>· cuidados</span>` : `Cuidados Saúde <span>· todos</span>`;
   document.getElementById('cab-sub').textContent = p ? (p.descricao || '') : PACIENTES.map(x => x.nome).join(' · ');
 
   // A aba Banhos é o roteiro do Freddy
@@ -2938,10 +3324,34 @@ const EMOJIS_PAC = ['👤', '👩', '👨', '👵', '👴', '🧒', '🐶', '�
 function abrirEditorPaciente(id) {
   if (!estado.eu.admin) return;
   const orig = id ? estado.pacientes.find(p => p.id === id) : null;
-  _editPac = { pac: orig ? { ...orig } : { id: '', nome: '', emoji: '👤', descricao: '', receita: '', medicoTitulo: 'Médico responsável', medicoNome: '', medicoDetalhes: '' }, novo: !orig };
-  const p = _editPac.pac;
+  const pac = orig ? { ...orig } : { id: '', nome: '', emoji: '👤', descricao: '', receita: '' };
+  pac.medicos = JSON.parse(JSON.stringify(medicosDe(pac)));
+  if (!pac.medicos.length) pac.medicos.push({ id: novoIdMedico(), titulo: 'Médico responsável', nome: '', detalhes: '', receita: '' });
+  _editPac = { pac, novo: !orig };
   document.getElementById('modal-pac-titulo').textContent = orig ? 'Editar paciente' : 'Novo paciente';
   document.getElementById('pac-excluir').style.display = orig ? '' : 'none';
+  renderEditorPaciente();
+  document.getElementById('modal-pac').classList.add('aberto');
+}
+
+function novoIdMedico() { return 'dr-' + Math.random().toString(36).slice(2, 8); }
+
+function renderEditorPaciente() {
+  const p = _editPac.pac;
+  const usados = id => (estado.meds || []).filter(m => !m.removido && m.paciente === p.id && (m.medico || 'principal') === id).length;
+  const medicosHTML = p.medicos.map((d, i) => `
+    <div class="medico-bloco">
+      <div class="form-linha">
+        <div class="form-campo"><label>Especialidade / título</label><input type="text" data-dr="${i}" data-f="titulo" value="${esc(d.titulo)}" placeholder="Ex.: Cardiologista"></div>
+        <div class="form-campo"><label>Nome do médico</label><input type="text" data-dr="${i}" data-f="nome" value="${esc(d.nome)}" placeholder="Ex.: Dra. Ana Souza"></div>
+      </div>
+      <div class="form-campo"><label>Receita (aparece no cartão do médico)</label><input type="text" data-dr="${i}" data-f="receita" value="${esc(d.receita)}" placeholder="Ex.: Receita de 10/11/2026"></div>
+      <div class="form-campo"><label>Contatos (um por linha, ex.: “Cel: (51) 9999-9999”)</label><textarea data-dr="${i}" data-f="detalhes" rows="2">${esc(d.detalhes)}</textarea></div>
+      <div style="display:flex; justify-content:space-between; align-items:center; gap:0.5rem;">
+        <span class="dica" style="margin:0;">${usados(d.id) ? `💊 ${usados(d.id)} remédio(s) receitado(s)` : ''}</span>
+        <button class="btn sec pequeno" onclick="removerMedicoPac(${i})">Remover médico</button>
+      </div>
+    </div>`).join('');
   document.getElementById('modal-pac-corpo').innerHTML = `
     <div class="form-linha">
       <div class="form-campo" style="flex:2 1 200px;"><label>Nome *</label><input type="text" id="pac-nome" value="${esc(p.nome)}" placeholder="Ex.: Lauri"></div>
@@ -2950,14 +3360,39 @@ function abrirEditorPaciente(id) {
       </select></div>
     </div>
     <div class="form-campo"><label>Descrição (aparece no topo)</label><input type="text" id="pac-desc" value="${esc(p.descricao)}" placeholder="Ex.: 72 anos · pressão alta"></div>
-    <div class="form-campo"><label>Receita / observação (aparece em Medicamentos)</label><input type="text" id="pac-receita" value="${esc(p.receita)}" placeholder="Ex.: Receita de 10/11/2026 — Dra. Ana"></div>
-    <div class="form-linha">
-      <div class="form-campo"><label>Título</label><input type="text" id="pac-mtit" value="${esc(p.medicoTitulo)}" placeholder="Médico responsável"></div>
-      <div class="form-campo"><label>Nome do médico</label><input type="text" id="pac-mnome" value="${esc(p.medicoNome)}"></div>
-    </div>
-    <div class="form-campo"><label>Contatos do médico (um por linha, ex.: “Cel: (51) 9999-9999”)</label><textarea id="pac-mdet" rows="3">${esc(p.medicoDetalhes)}</textarea></div>
+    <div class="form-campo"><label>Observação geral (aparece em Medicamentos)</label><input type="text" id="pac-receita" value="${esc(p.receita)}" placeholder="Ex.: Alergia a dipirona"></div>
+    <div class="ajuste-titulo" style="margin-top:0.75rem;">👨‍⚕️ Médicos</div>
+    ${medicosHTML || '<p class="dica">Nenhum médico cadastrado.</p>'}
+    <button class="btn sec pequeno" onclick="addMedicoPac()">+ Adicionar médico</button>
   `;
-  document.getElementById('modal-pac').classList.add('aberto');
+}
+
+function lerEditorPaciente() {
+  const p = _editPac.pac;
+  const v = id => document.getElementById(id).value.trim();
+  p.nome = v('pac-nome'); p.emoji = v('pac-emoji'); p.descricao = v('pac-desc'); p.receita = v('pac-receita');
+  const corpo = document.getElementById('modal-pac-corpo');
+  p.medicos.forEach((d, i) => {
+    for (const f of ['titulo', 'nome', 'receita', 'detalhes']) {
+      const el = corpo.querySelector(`[data-dr="${i}"][data-f="${f}"]`);
+      if (el) d[f] = el.value.trim();
+    }
+  });
+}
+
+function addMedicoPac() {
+  lerEditorPaciente();
+  _editPac.pac.medicos.push({ id: novoIdMedico(), titulo: '', nome: '', detalhes: '', receita: '' });
+  renderEditorPaciente();
+}
+
+function removerMedicoPac(i) {
+  lerEditorPaciente();
+  const d = _editPac.pac.medicos[i];
+  const n = (estado.meds || []).filter(m => !m.removido && m.paciente === _editPac.pac.id && (m.medico || 'principal') === d.id).length;
+  if ((d.nome || d.titulo || n) && !confirm(`Remover ${d.nome || 'este médico'}?${n ? ` ${n} remédio(s) ficam sem médico informado.` : ''}`)) return;
+  _editPac.pac.medicos.splice(i, 1);
+  renderEditorPaciente();
 }
 
 function fecharEditorPaciente() {
@@ -2966,11 +3401,11 @@ function fecharEditorPaciente() {
 }
 
 function salvarEditorPaciente() {
+  lerEditorPaciente();
   const p = _editPac.pac;
-  const v = id => document.getElementById(id).value.trim();
-  p.nome = v('pac-nome'); p.emoji = v('pac-emoji'); p.descricao = v('pac-desc'); p.receita = v('pac-receita');
-  p.medicoTitulo = v('pac-mtit'); p.medicoNome = v('pac-mnome'); p.medicoDetalhes = document.getElementById('pac-mdet').value.trim();
   if (!p.nome) { alert('Informe o nome do paciente.'); return; }
+  p.medicos = p.medicos.filter(d => d.nome || d.titulo || d.detalhes || d.receita);
+  delete p.medicoTitulo; delete p.medicoNome; delete p.medicoDetalhes;
   p.atualizado = new Date().toISOString();
   if (_editPac.novo) {
     const base = p.nome.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 20) || 'paciente';
@@ -3036,6 +3471,7 @@ function renderTudo() {
   renderHoje();
   renderSemana();
   renderMeds();
+  renderEstoque();
   renderBanhos();
   renderNotas();
   renderHistorico();
@@ -3066,6 +3502,7 @@ if (sb) {
     .then(() => iniciarSubscribe());
 } else {
   setSyncStatus('📴 sem sync', 'var(--texto-fraco)');
+  verificarEstoque();
 }
 
 // Atualiza a cada minuto o "atrasada" / próxima dose
