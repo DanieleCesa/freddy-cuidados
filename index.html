@@ -1043,6 +1043,12 @@ var SUPABASE_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS
         const { lista, online } = await buscarUsuarios();
         const existe = ativos(lista).find(u => normNome(u.nome) === normNome(nome));
         if (modo === 'entrar') {
+          if (!existe && online && !ativos(lista).length) {
+            // Ninguém criou acesso ainda: leva direto para criar
+            modo = 'criar'; aplicarModo();
+            erro.textContent = 'Ninguém criou acesso ainda. Crie o seu: repita a senha e digite o código da família.';
+            return;
+          }
           if (!existe) { erro.textContent = online ? 'Nome não encontrado. Primeira vez? Crie seu acesso.' : 'Sem internet para conferir o acesso.'; return; }
           let raw;
           try { raw = await desembrulhar(existe, senha); }
@@ -1067,7 +1073,7 @@ var SUPABASE_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS
         console.warn('acesso:', err);
         erro.textContent = 'Algo deu errado. Tente de novo.';
       } finally {
-        botao.disabled = false; botao.textContent = txt;
+        botao.disabled = false; botao.textContent = modo === 'entrar' ? 'Entrar' : 'Criar meu acesso';
       }
     });
   });
