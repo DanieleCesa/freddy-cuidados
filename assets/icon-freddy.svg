@@ -1,6 +1,0 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
-  <!-- Cruz vermelha (enfermaria) sobre fundo branco -->
-  <rect width="512" height="512" rx="110" fill="#ffffff"/>
-  <rect x="8" y="8" width="496" height="496" rx="104" fill="none" stroke="#e8e4e0" stroke-width="6"/>
-  <path fill="#d62828" d="M206 116h100a14 14 0 0 1 14 14v76h76a14 14 0 0 1 14 14v100a14 14 0 0 1-14 14h-76v76a14 14 0 0 1-14 14H206a14 14 0 0 1-14-14v-76h-76a14 14 0 0 1-14-14V206a14 14 0 0 1 14-14h76v-76a14 14 0 0 1 14-14z"/>
-</svg>

@@ -4,13 +4,13 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>APP Cuidados Saúde</title>
-<link rel="manifest" href="freddy-manifest.webmanifest">
+<link rel="manifest" href="cuidados.webmanifest">
 <meta name="theme-color" content="#4a7a3a">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="apple-mobile-web-app-title" content="Cuidados Saúde">
-<link rel="apple-touch-icon" href="assets/apple-touch-icon.png">
-<link rel="icon" type="image/svg+xml" href="assets/icon-freddy.svg">
+<link rel="apple-touch-icon" href="assets/icone-cuidados-apple.png">
+<link rel="icon" type="image/png" sizes="32x32" href="assets/icone-cuidados-32.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;500;600;700&family=Jost:wght@300;400;500;600&display=swap" rel="stylesheet">
@@ -2425,8 +2425,8 @@ async function reagendarTodas() {
       estado.notif.antecMin > 0 ? ` (em ${estado.notif.antecMin} min)` : ''}`;
     const opcoes = {
       body: corpo,
-      icon: 'assets/icon-freddy.svg',
-      badge: 'assets/icon-freddy.svg',
+      icon: 'assets/icone-cuidados-192.png',
+      badge: 'assets/icone-cuidados-192.png',
       tag: keyDose(d.med.id, d.data, d.hora),
       requireInteraction: false,
       data: { dose: keyDose(d.med.id, d.data, d.hora) }
@@ -2513,8 +2513,8 @@ async function testarNotif() {
   await registrarSW();
   const opts = {
     body: 'Se você está vendo isto, as notificações estão funcionando! 🐶',
-    icon: 'assets/icon-freddy.svg',
-    badge: 'assets/icon-freddy.svg'
+    icon: 'assets/icone-cuidados-192.png',
+    badge: 'assets/icone-cuidados-192.png'
   };
   if (swReg) await swReg.showNotification('Cuidados Saúde · teste', opts);
   else new Notification('Cuidados Saúde · teste', opts);
@@ -2911,7 +2911,7 @@ function verificarEstoque() {
     if (topic) estado.filaAvisos.push({ topic, title: titulo, message: msg, tags: ['shopping_cart'], priority: est.nivel === 'acabou' ? 4 : 3 });
     try {
       if ('Notification' in window && Notification.permission === 'granted' && swReg) {
-        swReg.showNotification(titulo, { body: msg, icon: 'assets/icon-freddy.svg', tag: 'estoque|' + m.id });
+        swReg.showNotification(titulo, { body: msg, icon: 'assets/icone-cuidados-192.png', tag: 'estoque|' + m.id });
       }
     } catch (e) {}
   }
