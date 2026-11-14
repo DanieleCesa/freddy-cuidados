@@ -6,8 +6,9 @@ App PWA para gerenciar remédios e cuidados da família: o Freddy (Shih Tzu, 14 
 
 Abra: <https://danielecesa.github.io/freddy-cuidados/>
 
-- Protegido por senha. Instale como PWA no celular para receber lembretes.
-- Os dados sincronizam entre celulares pelo Supabase, **criptografados com a senha do app** (AES-GCM). Quem lê a nuvem vê só dados embaralhados.
+- Cada pessoa entra com **o próprio nome e senha**. Para criar um acesso novo é preciso o **código da família** (a senha antiga do app). O administrador pode remover acessos em ⚙️ Ajustes.
+- Instale como PWA no celular para receber lembretes.
+- Os dados sincronizam entre celulares pelo Supabase, **criptografados** (AES-GCM) com a chave da família; cada pessoa guarda na nuvem uma cópia dessa chave trancada com a própria senha. Quem lê a nuvem vê só dados embaralhados.
 - O administrador (PIN próprio) cadastra pacientes e remédios e recebe avisos pelo app **ntfy** quando alguém marca uma dose.
 - Uma rotina do GitHub Actions acessa o Supabase 2x por semana para o projeto gratuito não pausar.
 - Cada paciente pode ter **vários médicos**; cada remédio indica qual médico receitou.

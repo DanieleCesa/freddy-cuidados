@@ -767,6 +767,10 @@
     margin-top: 0.5rem;
     min-height: 1.2rem;
   }
+  #lock input.lock-txt { letter-spacing: normal; font-size: 1.05rem; }
+  #lock .lock-link { display:inline-block; margin-top:0.9rem; color:rgba(255,255,255,0.85); font-size:0.85rem; }
+  #lock .dica-lock { color:rgba(255,255,255,0.7); font-size:0.78rem; margin:-0.25rem 0 0.75rem; }
+  #lock button:disabled { opacity:0.6; cursor:wait; }
   body.locked { overflow: hidden; }
   body.locked > *:not(#lock):not(script) { display: none !important; }
   /* ---- Administrador / editor de remédios ---- */
@@ -834,96 +838,195 @@
   <div class="box">
     <div class="emoji">🏥🔒</div>
     <h1>APP Cuidados Saúde</h1>
-    <div class="sub">Digite a senha para continuar</div>
+    <div class="sub" id="lock-sub">Entre com seu nome e sua senha</div>
     <form id="lock-form" autocomplete="off">
-      <input type="password" id="lock-input" inputmode="numeric" placeholder="senha" autofocus>
-      <button type="submit">Destravar</button>
+      <input type="text" id="lock-nome" class="lock-txt" placeholder="seu nome" autocomplete="username" maxlength="40">
+      <input type="password" id="lock-input" placeholder="sua senha" autocomplete="current-password">
+      <input type="password" id="lock-senha2" placeholder="repita a senha" autocomplete="new-password" style="display:none">
+      <input type="password" id="lock-codigo" placeholder="código da família" autocomplete="off" style="display:none">
+      <div class="dica-lock" id="lock-dica" style="display:none"></div>
+      <button type="submit" id="lock-botao">Entrar</button>
       <div class="erro" id="lock-erro"></div>
+      <a href="#" id="lock-trocar" class="lock-link">Primeira vez aqui? Criar meu acesso</a>
     </form>
   </div>
 </div>
 
 <script>
+// Nuvem (Supabase) — endereço e chave pública (anon). Usados também pela rotina keep-alive.
+var SUPABASE_URL = 'https://bkyodpgybvvennfadhhc.supabase.co';
+var SUPABASE_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJreW9kcGd5YnZ2ZW5uZmFkaGhjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODEzNzA2MzQsImV4cCI6MjA5Njk0NjYzNH0.N_jT5oUQomUvk64rAO-It0wAuD6RnM1cbGsxZ5Aw1VQ';
+
+/* ACESSO — cada pessoa tem nome + senha própria.
+   Os dados na nuvem são cifrados com uma "chave da família". Cada pessoa guarda na nuvem uma
+   cópia dessa chave trancada com a própria senha (PBKDF2 + AES-GCM). Para criar um acesso novo
+   é preciso o código da família (a senha antiga do app). */
 (function(){
-  const SENHA_HASH = '12d9634a066ef75f5c94fc8b7cc77250f4fbf254b79fe7252e36dc22d0b6d40c';
+  const CODIGO_HASH = '12d9634a066ef75f5c94fc8b7cc77250f4fbf254b79fe7252e36dc22d0b6d40c';
   const UNLOCK_KEY = 'freddy-unlocked-v1';
   const CHAVE_KEY = 'cuidados-chave-v1';
-  // A chave que embaralha os dados na nuvem é derivada da senha do app.
+  const USER_KEY = 'cuidados-usuario-v1';         // {id, nome} de quem entrou neste aparelho
+  const CACHE_USERS = 'cuidados-usuarios-cache-v1'; // para entrar sem internet
+  const PENDENTE = 'cuidados-usuario-novo-v1';     // acesso criado aqui, ainda não enviado
   window._chavePronta = new Promise(r => { window._resolverChave = r; });
 
-  async function derivarChave(senha) {
-    const base = await crypto.subtle.importKey('raw', new TextEncoder().encode(senha), 'PBKDF2', false, ['deriveKey']);
-    return crypto.subtle.deriveKey(
-      { name: 'PBKDF2', salt: new TextEncoder().encode('freddy-cuidados-cripto-v1'), iterations: 310000, hash: 'SHA-256' },
-      base, { name: 'AES-GCM', length: 256 }, true, ['encrypt', 'decrypt']);
-  }
-  async function guardarChave(k) {
-    const raw = new Uint8Array(await crypto.subtle.exportKey('raw', k));
-    localStorage.setItem(CHAVE_KEY, btoa(String.fromCharCode(...raw)));
-  }
-  async function carregarChave() {
-    const b = localStorage.getItem(CHAVE_KEY);
-    if (!b) return null;
-    const raw = Uint8Array.from(atob(b), c => c.charCodeAt(0));
-    return crypto.subtle.importKey('raw', raw, { name: 'AES-GCM' }, false, ['encrypt', 'decrypt']);
-  }
+  const enc = new TextEncoder();
+  const b64 = bytes => btoa(String.fromCharCode(...bytes));
+  const deb64 = s => Uint8Array.from(atob(s), c => c.charCodeAt(0));
+  const normNome = s => String(s || '').trim().toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/\s+/g, ' ');
 
-  async function sha256(s) {
-    const enc = new TextEncoder().encode(s);
-    const buf = await crypto.subtle.digest('SHA-256', enc);
-    return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2,'0')).join('');
+  async function chaveDaFamilia(codigo) {
+    const base = await crypto.subtle.importKey('raw', enc.encode(codigo), 'PBKDF2', false, ['deriveKey']);
+    const k = await crypto.subtle.deriveKey(
+      { name: 'PBKDF2', salt: enc.encode('freddy-cuidados-cripto-v1'), iterations: 310000, hash: 'SHA-256' },
+      base, { name: 'AES-GCM', length: 256 }, true, ['encrypt', 'decrypt']);
+    return new Uint8Array(await crypto.subtle.exportKey('raw', k));
   }
+  async function chaveDaSenha(senha, salt) {
+    const base = await crypto.subtle.importKey('raw', enc.encode(senha), 'PBKDF2', false, ['deriveKey']);
+    return crypto.subtle.deriveKey({ name: 'PBKDF2', salt, iterations: 310000, hash: 'SHA-256' },
+      base, { name: 'AES-GCM', length: 256 }, false, ['encrypt', 'decrypt']);
+  }
+  // Tranca a chave da família com a senha da pessoa
+  async function embrulhar(raw, senha) {
+    const salt = crypto.getRandomValues(new Uint8Array(16));
+    const iv = crypto.getRandomValues(new Uint8Array(12));
+    const k = await chaveDaSenha(senha, salt);
+    const wk = new Uint8Array(await crypto.subtle.encrypt({ name: 'AES-GCM', iv }, k, raw));
+    return { salt: b64(salt), iv: b64(iv), wk: b64(wk) };
+  }
+  // Destranca (falha se a senha estiver errada)
+  async function desembrulhar(u, senha) {
+    const k = await chaveDaSenha(senha, deb64(u.salt));
+    return new Uint8Array(await crypto.subtle.decrypt({ name: 'AES-GCM', iv: deb64(u.iv) }, k, deb64(u.wk)));
+  }
+  async function sha256(s) {
+    const buf = await crypto.subtle.digest('SHA-256', enc.encode(s));
+    return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2, '0')).join('');
+  }
+  function chaveGuardada() { const b = localStorage.getItem(CHAVE_KEY); return b ? deb64(b) : null; }
+
+  // Lista de acessos (só nome + chave trancada; sem senhas). Com cache para usar offline.
+  async function buscarUsuarios() {
+    try {
+      const r = await fetch(`${SUPABASE_URL}/rest/v1/freddy_estado?id=eq.1&select=usuarios:dados->usuarios`,
+        { headers: { apikey: SUPABASE_ANON, Authorization: 'Bearer ' + SUPABASE_ANON } });
+      if (!r.ok) throw new Error('HTTP ' + r.status);
+      const j = await r.json();
+      const lista = (j[0] && Array.isArray(j[0].usuarios)) ? j[0].usuarios : [];
+      try { localStorage.setItem(CACHE_USERS, JSON.stringify(lista)); } catch (e) {}
+      return { lista, online: true };
+    } catch (e) {
+      let lista = [];
+      try { lista = JSON.parse(localStorage.getItem(CACHE_USERS) || '[]'); } catch (e2) {}
+      return { lista, online: false };
+    }
+  }
+  function ativos(lista) { return (lista || []).filter(u => u && u.id && !u.removido); }
 
   function destravar() {
     document.body.classList.remove('locked');
     const lock = document.getElementById('lock');
     if (lock) lock.style.display = 'none';
-    try { localStorage.setItem(UNLOCK_KEY, '1'); } catch(e){}
+    try { localStorage.setItem(UNLOCK_KEY, '1'); } catch (e) {}
+  }
+  async function concluir(raw, usuario) {
+    localStorage.setItem(CHAVE_KEY, b64(raw));
+    localStorage.setItem(USER_KEY, JSON.stringify({ id: usuario.id, nome: usuario.nome }));
+    const k = await crypto.subtle.importKey('raw', raw, { name: 'AES-GCM' }, false, ['encrypt', 'decrypt']);
+    window._resolverChave(k);
+    destravar();
+    if (window.aoEntrar) window.aoEntrar();
+  }
+  async function novoAcesso(raw, nome, senha) {
+    const agora = new Date().toISOString();
+    const rec = { id: 'u-' + b64(crypto.getRandomValues(new Uint8Array(6))).replace(/[^a-z0-9]/gi, '').slice(0, 8),
+                  nome, ...(await embrulhar(raw, senha)), criado: agora, atualizado: agora };
+    localStorage.setItem(PENDENTE, JSON.stringify(rec));
+    await concluir(raw, rec);
   }
 
-  // Já destravou antes neste aparelho (e já tem a chave)?
-  let pedirDeNovo = false;
+  // Usado pelo app (trocar senha)
+  window.CuidadosAcesso = { embrulhar, desembrulhar, chaveGuardada, USER_KEY, PENDENTE, CACHE_USERS,
+    sair() { [UNLOCK_KEY, CHAVE_KEY, USER_KEY].forEach(k => { try { localStorage.removeItem(k); } catch (e) {} }); location.reload(); } };
+
+  // Já entrou neste aparelho?
+  let modo = 'entrar';
   try {
-    if (localStorage.getItem(UNLOCK_KEY) === '1') {
-      if (localStorage.getItem(CHAVE_KEY)) {
+    if (localStorage.getItem(UNLOCK_KEY) === '1' && localStorage.getItem(CHAVE_KEY)) {
+      if (localStorage.getItem(USER_KEY)) {
         destravar();
-        carregarChave().then(k => window._resolverChave(k)).catch(() => {
-          localStorage.removeItem(CHAVE_KEY); localStorage.removeItem(UNLOCK_KEY); location.reload();
-        });
+        crypto.subtle.importKey('raw', chaveGuardada(), { name: 'AES-GCM' }, false, ['encrypt', 'decrypt'])
+          .then(k => window._resolverChave(k))
+          .catch(() => window.CuidadosAcesso.sair());
         return;
       }
-      pedirDeNovo = true;   // versão antiga: falta a chave — pede a senha uma vez
+      modo = 'migrar';   // versão anterior (senha única): cada pessoa cria seu acesso uma vez
     }
-  } catch(e){}
+  } catch (e) {}
 
   window.addEventListener('DOMContentLoaded', () => {
-    const form = document.getElementById('lock-form');
-    const input = document.getElementById('lock-input');
-    const erro = document.getElementById('lock-erro');
+    const $ = id => document.getElementById(id);
+    const form = $('lock-form'), erro = $('lock-erro'), botao = $('lock-botao');
     if (!form) return;
-    if (pedirDeNovo) {
-      const sub = document.querySelector('#lock .sub');
-      if (sub) sub.textContent = 'Atualização de segurança: digite a senha mais uma vez';
+
+    function aplicarModo() {
+      const criar = modo !== 'entrar';
+      $('lock-senha2').style.display = criar ? '' : 'none';
+      $('lock-codigo').style.display = modo === 'criar' ? '' : 'none';
+      $('lock-trocar').style.display = modo === 'migrar' ? 'none' : '';
+      $('lock-trocar').textContent = modo === 'entrar' ? 'Primeira vez aqui? Criar meu acesso' : 'Já tenho acesso — entrar';
+      $('lock-input').placeholder = criar ? 'crie uma senha (mín. 6)' : 'sua senha';
+      $('lock-input').autocomplete = criar ? 'new-password' : 'current-password';
+      botao.textContent = modo === 'entrar' ? 'Entrar' : 'Criar meu acesso';
+      $('lock-sub').textContent = modo === 'entrar' ? 'Entre com seu nome e sua senha'
+        : modo === 'criar' ? 'Crie seu acesso com uma senha só sua'
+        : 'Atualização: agora cada pessoa tem a própria senha. Crie a sua.';
+      const dica = $('lock-dica');
+      dica.style.display = modo === 'criar' ? '' : 'none';
+      dica.textContent = 'O código da família é a senha antiga do app — peça a quem administra.';
+      erro.textContent = '';
+      setTimeout(() => $('lock-nome').focus(), 50);
     }
-    setTimeout(() => input && input.focus(), 100);
+    $('lock-trocar').addEventListener('click', e => { e.preventDefault(); modo = modo === 'entrar' ? 'criar' : 'entrar'; aplicarModo(); });
+    aplicarModo();
 
     form.addEventListener('submit', async (e) => {
       e.preventDefault();
       erro.textContent = '';
-      const val = input.value.trim();
-      if (!val) return;
-      const h = await sha256(val);
-      if (h === SENHA_HASH) {
-        try {
-          const k = await derivarChave(val);
-          await guardarChave(k);
-          window._resolverChave(k);
-        } catch (err) { console.warn('chave:', err); }
-        destravar();
-      } else {
-        erro.textContent = 'Senha incorreta';
-        input.value = '';
-        input.focus();
+      const nome = $('lock-nome').value.trim().replace(/\s+/g, ' ');
+      const senha = $('lock-input').value;
+      if (!nome || !senha) { erro.textContent = 'Preencha o nome e a senha'; return; }
+      botao.disabled = true; const txt = botao.textContent; botao.textContent = 'Aguarde…';
+      try {
+        const { lista, online } = await buscarUsuarios();
+        const existe = ativos(lista).find(u => normNome(u.nome) === normNome(nome));
+        if (modo === 'entrar') {
+          if (!existe) { erro.textContent = online ? 'Nome não encontrado. Primeira vez? Crie seu acesso.' : 'Sem internet para conferir o acesso.'; return; }
+          let raw;
+          try { raw = await desembrulhar(existe, senha); }
+          catch (err) { erro.textContent = 'Senha incorreta'; $('lock-input').value = ''; $('lock-input').focus(); return; }
+          await concluir(raw, existe);
+          return;
+        }
+        // criar / migrar
+        if (nome.length < 2) { erro.textContent = 'Nome muito curto'; return; }
+        if (senha.length < 6) { erro.textContent = 'A senha precisa ter pelo menos 6 caracteres'; return; }
+        if (senha !== $('lock-senha2').value) { erro.textContent = 'As senhas não conferem'; return; }
+        if (existe) { erro.textContent = 'Já existe um acesso com esse nome. Use outro nome (ex.: Maria S.) ou entre.'; return; }
+        let raw;
+        if (modo === 'migrar') raw = chaveGuardada();
+        else {
+          const codigo = $('lock-codigo').value.trim();
+          if (await sha256(codigo) !== CODIGO_HASH) { erro.textContent = 'Código da família incorreto'; return; }
+          raw = await chaveDaFamilia(codigo);
+        }
+        await novoAcesso(raw, nome, senha);
+      } catch (err) {
+        console.warn('acesso:', err);
+        erro.textContent = 'Algo deu errado. Tente de novo.';
+      } finally {
+        botao.disabled = false; botao.textContent = txt;
       }
     });
   });
@@ -958,7 +1061,7 @@
   <button data-aba="banhos">Banhos</button>
   <button data-aba="anotacoes">Anotações</button>
   <button data-aba="historico">Histórico</button>
-  <button data-aba="notif">🔔 Notificações</button>
+  <button data-aba="notif">⚙️ Ajustes</button>
 </nav>
 
 <main>
@@ -1053,7 +1156,7 @@
 
   <!-- NOTIFICAÇÕES -->
   <section class="aba" id="aba-notif">
-    <h2 class="titulo-aba">🔔 Notificações</h2>
+    <h2 class="titulo-aba">⚙️ Ajustes e notificações</h2>
 
     <div class="card" id="card-usuario"></div>
     <div class="card" id="card-ntfy"></div>
@@ -1161,6 +1264,20 @@
     <div class="modal-acoes">
       <button class="btn sec" onclick="fecharEditorMed()">Cancelar</button>
       <button class="btn" onclick="salvarEditorMed()">Salvar</button>
+    </div>
+  </div>
+</div>
+
+<div id="modal-senha" class="modal" onclick="if(event.target===this)fecharTrocarSenha()">
+  <div class="modal-caixa" style="max-width:400px;">
+    <h3 class="serif">🔑 Trocar minha senha</h3>
+    <div class="form-campo"><label>Senha atual</label><input type="password" id="ts-atual" class="campo-txt" autocomplete="current-password"></div>
+    <div class="form-campo"><label>Senha nova (mín. 6)</label><input type="password" id="ts-nova" class="campo-txt" autocomplete="new-password"></div>
+    <div class="form-campo"><label>Repita a senha nova</label><input type="password" id="ts-nova2" class="campo-txt" autocomplete="new-password"></div>
+    <div id="ts-erro" style="color:var(--pendente); font-size:0.85rem; min-height:1.2rem;"></div>
+    <div class="modal-acoes">
+      <button class="btn sec" onclick="fecharTrocarSenha()">Cancelar</button>
+      <button class="btn" onclick="salvarTrocarSenha()">Salvar</button>
     </div>
   </div>
 </div>
@@ -1357,7 +1474,25 @@ function esc(s) {
 const STORAGE_KEY = 'freddy-cuidados-v1';
 let estado = carregar();
 migrarFeitas();
+aplicarUsuarioLogado();
 prepararMeds();
+
+// Quem entrou neste aparelho vira o "nome" do histórico; acesso recém-criado entra na lista
+function aplicarUsuarioLogado() {
+  const A = window.CuidadosAcesso;
+  if (!A) return;
+  try {
+    const pend = JSON.parse(localStorage.getItem(A.PENDENTE) || 'null');
+    if (pend && pend.id && !estado.usuarios.some(u => u.id === pend.id)) estado.usuarios.push(pend);
+    if (pend) localStorage.removeItem(A.PENDENTE);
+    const eu = JSON.parse(localStorage.getItem(A.USER_KEY) || 'null');
+    if (eu && eu.id) { estado.eu.usuarioId = eu.id; estado.eu.nome = eu.nome; }
+    salvarLocal();
+  } catch (e) { console.warn('usuário:', e); }
+}
+// Chamado pela tela de acesso logo depois de entrar
+window.aoEntrar = () => { aplicarUsuarioLogado(); if (typeof renderTudo === 'function') renderTudo(); agendarPush(); };
+function usuariosAtivos() { return (estado.usuarios || []).filter(u => u && u.id && !u.removido); }
 
 function carregar() {
   try {
@@ -1382,6 +1517,7 @@ function normalizarEstado(s) {
   s.filaAvisos = Array.isArray(s.filaAvisos) ? s.filaAvisos : [];
   s.estoque = s.estoque || {};          // sincronizado: {medId: {qtd, t, quem}} — contagem base
   s.avisosEstoque = s.avisosEstoque || {};   // sincronizado: {medId: t da contagem já avisada}
+  s.usuarios = Array.isArray(s.usuarios) ? s.usuarios : [];   // sincronizado FORA da cifra: nome + chave trancada
   return s;
 }
 function salvarLocal() {
@@ -1412,8 +1548,7 @@ function salvar() {
 /* =========================================================
    SINCRONIZAÇÃO — Supabase
    ========================================================= */
-const SUPABASE_URL = 'https://bkyodpgybvvennfadhhc.supabase.co';
-const SUPABASE_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJreW9kcGd5YnZ2ZW5uZmFkaGhjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODEzNzA2MzQsImV4cCI6MjA5Njk0NjYzNH0.N_jT5oUQomUvk64rAO-It0wAuD6RnM1cbGsxZ5Aw1VQ';
+// SUPABASE_URL e SUPABASE_ANON ficam no script de acesso (topo da página)
 
 let sb = null;
 try {
@@ -1511,6 +1646,16 @@ function mergeEstado(remoto) {
     if ((v || '') >= (avisosEstoque[k] || '')) avisosEstoque[k] = v;
   }
 
+  // acessos: por id, o mais recente vence (remoção = removido:true)
+  const usrMap = {};
+  for (const u of [...(remoto.usuarios || []), ...(estado.usuarios || [])]) {
+    if (!u || !u.id) continue;
+    const a = usrMap[u.id];
+    if (!a || (u.atualizado || '') >= (a.atualizado || '')) usrMap[u.id] = u;
+  }
+  estado.usuarios = Object.values(usrMap);
+  try { localStorage.setItem('cuidados-usuarios-cache-v1', JSON.stringify(estado.usuarios)); } catch (e) {}
+
   estado.estoque = estoque;
   estado.avisosEstoque = avisosEstoque;
   estado.feitas = feitas;
@@ -1540,12 +1685,15 @@ async function pullMerge(silencioso = false) {
         return;
       }
       _criptoErro = false;
-      mergeEstado(dados);
+      const usrRemoto = Array.isArray(data.dados.usuarios) ? data.dados.usuarios : [];
+      mergeEstado({ ...dados, usuarios: usrRemoto });
       salvarLocal();
+      if (verificarAcessoRemovido()) return;
       renderTudo();
       verificarEstoque();
-      // Nuvem ainda sem cifra, ou celular antigo apagou campos: regrava
-      if (!cifrado || !dados.meds || !dados.pacientes || (!dados.config && estado.config.atualizado)) agendarPush();
+      // Nuvem ainda sem cifra, ou celular antigo apagou campos, ou acesso novo ainda não enviado: regrava
+      const faltaUsuario = estado.usuarios.some(u => !usrRemoto.some(r => r.id === u.id && (r.atualizado || '') >= (u.atualizado || '')));
+      if (!cifrado || !dados.meds || !dados.pacientes || (!dados.config && estado.config.atualizado) || faltaUsuario) agendarPush();
     }
     _ultimaSync = new Date();
     setSyncStatus('☁️ sincronizado', 'var(--verde)');
@@ -1566,7 +1714,7 @@ async function pushRemote() {
       let remoto;
       try { remoto = await decifrar(atual.dados); _criptoErro = false; }
       catch (e) { _criptoErro = true; throw new Error('dados da nuvem com outra senha — não vou gravar por cima'); }
-      mergeEstado(remoto);
+      mergeEstado({ ...remoto, usuarios: Array.isArray(atual.dados.usuarios) ? atual.dados.usuarios : [] });
     }
 
     const dados = {
@@ -1581,7 +1729,8 @@ async function pushRemote() {
       avisosEstoque: estado.avisosEstoque || {},
     };
     const { error } = await sb.from('freddy_estado').upsert({
-      id: 1, dados: await cifrar(dados), atualizado_em: new Date().toISOString()
+      // usuarios fica fora da cifra: precisa ser lido antes de entrar (só nome + chave trancada pela senha)
+      id: 1, dados: { ...(await cifrar(dados)), usuarios: estado.usuarios || [] }, atualizado_em: new Date().toISOString()
     });
     if (error) throw error;
     salvarLocal();
@@ -2291,8 +2440,7 @@ document.getElementById('sem-ant').addEventListener('click', () => { estado.sema
 document.getElementById('sem-prox').addEventListener('click', () => { estado.semanaOffset++; renderSemana(); });
 document.getElementById('btn-trancar').addEventListener('click', (e) => {
   e.preventDefault();
-  try { localStorage.removeItem('freddy-unlocked-v1'); localStorage.removeItem('cuidados-chave-v1'); } catch(err){}
-  location.reload();
+  window.CuidadosAcesso.sair();
 });
 document.getElementById('btn-sync').addEventListener('click', async (e) => {
   e.preventDefault();
@@ -2610,14 +2758,13 @@ function renderAjustes() {
   const cn = document.getElementById('card-ntfy');
   if (!cu || !cn) return;
   const admin = !!estado.eu.admin;
+  const pessoas = usuariosAtivos().sort((a, b) => a.nome.localeCompare(b.nome));
   cu.innerHTML = `
     <div class="ajuste-titulo">👤 Quem usa este celular</div>
-    <div class="form-linha" style="align-items:flex-end;">
-      <div class="form-campo" style="flex:1 1 200px; margin-bottom:0;">
-        <label for="eu-nome">Seu nome</label>
-        <input type="text" id="eu-nome" class="campo-txt" maxlength="40" placeholder="Ex.: Maria" value="${esc(estado.eu.nome)}">
-      </div>
-      <button class="btn sec" onclick="salvarNome()">Salvar nome</button>
+    <p style="font-size:0.95rem;">Você entrou como <strong>${esc(estado.eu.nome || '—')}</strong>.</p>
+    <div style="display:flex; gap:0.5rem; flex-wrap:wrap; margin:0.5rem 0;">
+      <button class="btn sec pequeno" onclick="abrirTrocarSenha()">🔑 Trocar minha senha</button>
+      <button class="btn sec pequeno" onclick="window.CuidadosAcesso.sair()">🚪 Sair (entrar com outra pessoa)</button>
     </div>
     <p class="dica" style="margin-top:0.6rem;">
       ${admin ? '👑 Este celular está no <strong>modo administrador</strong>: pode alterar os remédios e recebe os avisos.'
@@ -2625,6 +2772,15 @@ function renderAjustes() {
     </p>
     ${admin ? '<button class="btn sec pequeno" onclick="sairAdmin()">Sair do modo administrador</button>'
             : '<button class="btn sec pequeno" onclick="entrarAdmin()">Entrar como administrador</button>'}
+    <div class="ajuste-titulo" style="margin-top:1rem;">👥 Pessoas com acesso</div>
+    <p class="dica">Cada pessoa entra com o próprio nome e senha. Para alguém novo entrar, ela toca em “Criar meu acesso” e usa o código da família.</p>
+    ${pessoas.length ? pessoas.map(u => `
+      <div style="display:flex; justify-content:space-between; align-items:center; gap:0.5rem; padding:0.35rem 0; border-bottom:1px solid var(--border-suave);">
+        <span>${esc(u.nome)}${u.id === estado.eu.usuarioId ? ' <span class="tag tag-pac">você</span>' : ''}
+          <span class="dica" style="display:inline;">· desde ${u.criado ? new Date(u.criado).toLocaleDateString('pt-BR') : '—'}</span></span>
+        ${admin && u.id !== estado.eu.usuarioId ? `<button class="btn sec pequeno" onclick="removerAcesso('${esc(u.id)}')">Remover acesso</button>` : ''}
+      </div>`).join('') : '<p class="dica">Ninguém ainda.</p>'}
+    ${admin ? '<p class="dica" style="margin-top:0.5rem;">Esqueceu a senha? Remova o acesso da pessoa e peça para ela criar de novo.</p>' : ''}
   `;
 
   const topico = estado.config && estado.config.ntfyTopico;
@@ -2667,6 +2823,58 @@ function renderAjustes() {
       ${estado.filaAvisos.length ? `<p class="dica">⏳ ${estado.filaAvisos.length} aviso(s) esperando internet para enviar.</p>` : ''}
     `;
   }
+}
+
+/* =========================================================
+   ACESSOS: trocar senha, remover acesso
+   ========================================================= */
+function abrirTrocarSenha() {
+  ['ts-atual', 'ts-nova', 'ts-nova2'].forEach(id => { document.getElementById(id).value = ''; });
+  document.getElementById('ts-erro').textContent = '';
+  document.getElementById('modal-senha').classList.add('aberto');
+  setTimeout(() => document.getElementById('ts-atual').focus(), 50);
+}
+function fecharTrocarSenha() { document.getElementById('modal-senha').classList.remove('aberto'); }
+
+async function salvarTrocarSenha() {
+  const A = window.CuidadosAcesso;
+  const erro = document.getElementById('ts-erro');
+  const atual = document.getElementById('ts-atual').value;
+  const nova = document.getElementById('ts-nova').value;
+  erro.textContent = '';
+  const eu = (estado.usuarios || []).find(u => u.id === estado.eu.usuarioId && !u.removido);
+  if (!eu) { erro.textContent = 'Seu acesso ainda não foi encontrado. Sincronize e tente de novo.'; return; }
+  if (nova.length < 6) { erro.textContent = 'A senha nova precisa ter pelo menos 6 caracteres.'; return; }
+  if (nova !== document.getElementById('ts-nova2').value) { erro.textContent = 'As senhas novas não conferem.'; return; }
+  try { await A.desembrulhar(eu, atual); }
+  catch (e) { erro.textContent = 'Senha atual incorreta.'; return; }
+  const embrulho = await A.embrulhar(A.chaveGuardada(), nova);
+  Object.assign(eu, embrulho, { atualizado: new Date().toISOString() });
+  salvar();
+  fecharTrocarSenha();
+  toast('🔑 Senha trocada');
+}
+
+function removerAcesso(id) {
+  if (!estado.eu.admin) return;
+  const u = (estado.usuarios || []).find(x => x.id === id);
+  if (!u || !confirm(`Remover o acesso de ${u.nome}? Ela sai do app no próximo uso e precisa criar o acesso de novo (com o código da família) para voltar.`)) return;
+  Object.assign(u, { removido: true, atualizado: new Date().toISOString() });
+  delete u.wk;   // apaga a cópia trancada da chave
+  salvar();
+  renderAjustes();
+  toast('Acesso removido');
+}
+
+// Se o administrador removeu o acesso de quem está neste aparelho, sai
+function verificarAcessoRemovido() {
+  const eu = (estado.usuarios || []).find(u => u.id === estado.eu.usuarioId);
+  if (eu && eu.removido) {
+    alert('Seu acesso foi removido pelo administrador.');
+    window.CuidadosAcesso.sair();
+    return true;
+  }
+  return false;
 }
 
 /* =========================================================
