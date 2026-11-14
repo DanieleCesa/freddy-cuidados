@@ -13,3 +13,4 @@ Abra: <https://danielecesa.github.io/freddy-cuidados/>
 - Uma rotina do GitHub Actions acessa o Supabase 2x por semana para o projeto gratuito não pausar.
 - Cada paciente pode ter **vários médicos**; cada remédio indica qual médico receitou.
 - **Estoque**: o administrador liga o controle no remédio (unidade, quanto gasta por dose, com quantos dias avisar). O estoque desce a cada dose marcada; qualquer cuidador registra compras ("🛒 Comprei") ou conta o que sobrou. Quando faltar pouco aparece o aviso de compra no app e vai um aviso pelo ntfy.
+- **Receita por foto ou PDF** (administrador, aba Medicamentos): o app lê a receita no próprio celular (PDF digital direto; foto/PDF escaneado com Tesseract), separa médico e remédios e mostra tudo para conferir antes de cadastrar. Receita manuscrita costuma não ser reconhecida.
